@@ -121,7 +121,7 @@
 
       <div class="flex items-center gap-1.5 shrink-0">
         <!-- ปุ่มตั้งค่า Google Sheets -->
-        <button onclick="openSheetConfigModal()" id="sheetConfigBtn"
+        <button onclick="openAccountModal()" id="sheetConfigBtn"
           class="flex items-center gap-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 px-2.5 py-1.5 rounded-xl text-xs font-bold transition">
           <i data-lucide="sheet" class="w-4 h-4"></i>
           <span class="hidden sm:inline">Google Sheets</span>
@@ -440,69 +440,80 @@
     </div>
   </div>
 
-  <!-- Modal 2: ตั้งค่าเชื่อมต่อ Google Sheets -->
-  <div id="sheetConfigModal" class="no-print fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
-    <div class="bg-white w-full max-w-xl rounded-t-3xl sm:rounded-2xl shadow-2xl border border-slate-200 max-h-[90vh] flex flex-col overflow-hidden">
+  <!-- หน้าใส่รหัสผ่าน (ครั้งแรกของแต่ละเครื่อง) + ตั้งค่า Sheet ครั้งแรก -->
+  <div id="loginModal" class="no-print fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div class="bg-white w-full max-w-md rounded-t-3xl sm:rounded-2xl shadow-2xl border border-slate-200 max-h-[90vh] flex flex-col overflow-hidden">
+      <div class="p-5 overflow-y-auto space-y-4">
+        <div class="flex items-center gap-3">
+          <div class="w-11 h-11 rounded-2xl bg-emerald-600 flex items-center justify-center text-white shrink-0">
+            <i data-lucide="lock-keyhole" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h3 class="text-base font-bold text-slate-900">ใส่รหัสผ่าน</h3>
+            <p class="text-xs text-slate-500">ใส่ครั้งเดียว เครื่องนี้จะจำไว้ รายชื่อลูกค้าจะตรงกันทุกเครื่อง</p>
+          </div>
+        </div>
+
+        <form onsubmit="event.preventDefault(); login();" class="space-y-2.5">
+          <input id="passwordInput" type="password" autocomplete="current-password" oninput="onPasswordInput()"
+            placeholder="รหัสผ่าน"
+            class="w-full px-3.5 py-3 rounded-xl border border-slate-300 text-base focus:ring-2 focus:ring-emerald-500 outline-none">
+          <label class="inline-flex items-center gap-1.5 text-xs text-slate-500 select-none cursor-pointer">
+            <input type="checkbox" onchange="passwordInput.type = this.checked ? 'text' : 'password'" class="rounded">
+            แสดงรหัสผ่าน
+          </label>
+          <p id="loginError" class="hidden text-xs font-semibold text-rose-600"></p>
+          <button id="loginBtn" type="submit"
+            class="w-full py-3 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-bold rounded-xl shadow-sm transition">
+            เข้าใช้งาน
+          </button>
+        </form>
+        <button onclick="skipLogin()" class="w-full text-xs text-slate-500 underline">ข้ามไปก่อน (พิมพ์ได้ แต่ไม่ซิงค์รายชื่อ)</button>
+
+        <details id="setupDetails" class="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-slate-700">
+          <summary class="font-bold text-slate-800 cursor-pointer">ตั้งค่า Google Sheet ครั้งแรก / เปลี่ยนรหัสผ่าน (ทำที่คอม)</summary>
+          <ol class="list-decimal list-inside space-y-1.5 text-slate-600 leading-relaxed mt-2">
+            <li>พิมพ์รหัสผ่านที่ต้องการในช่องด้านบน (อย่างน้อย 6 ตัว) แล้วกด
+              <button onclick="copyAppsScriptCode()" class="mt-1 px-2.5 py-1 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-[11px] font-bold inline-flex items-center gap-1">
+                <i data-lucide="copy" class="w-3 h-3"></i> คัดลอกโค้ด Apps Script
+              </button>
+            </li>
+            <li>เปิด Google Sheet "ฐานข้อมูลผู้รับพัสดุ" ไปที่ <strong>Extensions &gt; Apps Script</strong></li>
+            <li>ลบโค้ดเดิมทั้งหมด วางโค้ดที่คัดลอกมา กด Save</li>
+            <li>กด <strong>Deploy &gt; Manage deployments</strong> กดรูปดินสอ ตรง Version เลือก <strong>New version</strong> แล้วกด Deploy</li>
+            <li>กลับมากด <strong>เข้าใช้งาน</strong></li>
+          </ol>
+          <p class="text-[11px] text-slate-500 mt-2">โค้ดเก็บรหัสผ่านเป็นค่าแฮช ไม่ใช่ตัวรหัสจริง ถ้าลืมรหัสก็ตั้งใหม่ด้วยขั้นตอนนี้ได้ (เครื่องอื่นต้องใส่รหัสใหม่)</p>
+        </details>
+      </div>
+    </div>
+  </div>
+
+  <!-- สถานะการซิงค์ / ออกจากระบบ -->
+  <div id="accountModal" class="no-print fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div class="bg-white w-full max-w-md rounded-t-3xl sm:rounded-2xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden">
       <div class="px-4 py-3.5 border-b border-slate-200 flex items-center justify-between bg-emerald-50">
         <div class="flex items-center gap-2">
           <i data-lucide="sheet" class="w-5 h-5 text-emerald-600"></i>
-          <h3 class="text-sm font-bold text-emerald-950">เชื่อมต่อฐานข้อมูล Google Sheets</h3>
+          <h3 class="text-sm font-bold text-emerald-950">Google Sheets</h3>
         </div>
-        <button onclick="closeSheetConfigModal()" class="p-1.5 rounded-lg text-slate-400 hover:text-slate-700">
+        <button onclick="closeAccountModal()" class="p-1.5 rounded-lg text-slate-400 hover:text-slate-700">
           <i data-lucide="x" class="w-5 h-5"></i>
         </button>
       </div>
-
-      <div class="p-4 overflow-y-auto space-y-4 text-xs text-slate-700">
-        <div>
-          <label class="block font-bold text-slate-800 mb-1">1. Web App URL ที่ได้จาก Google Apps Script:</label>
-          <input id="gasUrlInput" type="url"
-            placeholder="https://script.google.com/macros/s/xxxxxx/exec"
-            class="w-full px-3 py-2.5 rounded-xl border border-slate-300 text-xs font-mono focus:ring-2 focus:ring-emerald-500 outline-none">
-        </div>
-
-        <div>
-          <label class="block font-bold text-slate-800 mb-1">2. รหัสเชื่อมต่อ (กันคนอื่นแอบอ่าน/แก้รายชื่อลูกค้า):</label>
-          <div class="flex items-center gap-1.5">
-            <input id="tokenInput" type="text" autocomplete="off" spellcheck="false"
-              class="flex-1 min-w-0 px-3 py-2.5 rounded-xl border border-slate-300 text-xs font-mono focus:ring-2 focus:ring-emerald-500 outline-none">
-            <button onclick="regenerateToken()" title="สุ่มรหัสใหม่"
-              class="px-2.5 py-2.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-slate-600 shrink-0">
-              <i data-lucide="key-round" class="w-4 h-4"></i>
-            </button>
-          </div>
-          <p class="text-[11px] text-slate-500 mt-1">รหัสนี้ฝังอยู่ในโค้ด Apps Script ที่คัดลอกไป เครื่องอื่นต้องใส่ URL และรหัสเดียวกันนี้ถึงจะซิงค์ได้</p>
-        </div>
-
+      <div class="p-4 space-y-3 text-xs text-slate-700">
+        <p id="accountStatus" class="font-semibold text-slate-800"></p>
         <div class="flex items-center gap-2">
-          <button onclick="saveGasUrlConfig()"
+          <button onclick="syncNow(true)"
             class="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-sm transition flex items-center justify-center gap-1.5">
-            <i data-lucide="circle-check" class="w-4 h-4"></i> บันทึกและซิงค์ทันที
+            <i data-lucide="refresh-cw" class="w-4 h-4"></i> ซิงค์ตอนนี้
           </button>
-          <button onclick="pushLocalToGoogleSheet()"
-            class="py-2.5 px-3 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 font-bold rounded-xl transition">
-            ส่งรายชื่อในเครื่องขึ้น Sheet
+          <button onclick="logout()"
+            class="py-2.5 px-3 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold rounded-xl transition flex items-center gap-1.5">
+            <i data-lucide="log-out" class="w-4 h-4"></i> ออกจากระบบ
           </button>
         </div>
-
-        <!-- วิธีสร้าง Google Sheet & โค้ด Apps Script -->
-        <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2">
-          <div class="flex items-center justify-between gap-2">
-            <span class="font-bold text-slate-800">ขั้นตอนตั้งค่า Google Sheets (ทำครั้งเดียว):</span>
-            <button onclick="copyAppsScriptCode()" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-[11px] font-bold flex items-center gap-1 shrink-0">
-              <i data-lucide="copy" class="w-3 h-3"></i> คัดลอกโค้ด Apps Script
-            </button>
-          </div>
-          <ol class="list-decimal list-inside space-y-1 text-slate-600 leading-relaxed">
-            <li>เปิดไฟล์ <strong>Google Sheets</strong> ที่จะใช้เก็บรายชื่อ</li>
-            <li>ไปที่เมนู <strong>ส่วนขยาย (Extensions) &gt; Apps Script</strong></li>
-            <li>ลบโค้ดเก่าออกทั้งหมด กดปุ่ม <strong>"คัดลอกโค้ด Apps Script"</strong> ด้านบนแล้วไปวางแทน กด Save</li>
-            <li><strong>ถ้ายังไม่เคย deploy:</strong> กด <strong>Deploy &gt; New deployment</strong> เลือกประเภท <strong>Web app</strong>, Execute as <strong>"Me"</strong>, Who has access <strong>"Anyone"</strong> แล้วกด Deploy (ครั้งแรกจะขออนุญาตสิทธิ์ ให้กดอนุญาต)</li>
-            <li><strong>ถ้าเคย deploy แล้ว:</strong> กด <strong>Deploy &gt; Manage deployments</strong> กดรูปดินสอ ตรง Version เลือก <strong>"New version"</strong> แล้วกด Deploy (URL เดิมใช้ต่อได้)</li>
-            <li>คัดลอก <strong>Web App URL</strong> มาวางในช่องที่ 1 แล้วกดบันทึก</li>
-          </ol>
-          <p class="text-[11px] text-slate-500">สคริปต์จะใช้แท็บชื่อ <strong>Recipients</strong> ถ้าไม่มี จะหาแท็บที่หัวคอลัมน์ A1 เป็น "ID" แล้วเปลี่ยนชื่อให้เอง</p>
-        </div>
+        <p class="text-[11px] text-slate-500">ออกจากระบบจะลบรายชื่อที่เก็บในเครื่องนี้ ส่วนใน Google Sheet ยังอยู่ครบ</p>
       </div>
     </div>
   </div>
@@ -700,18 +711,21 @@ function reply(obj) {
   <script>
     const STORAGE_SENDER_KEY = 'parcel_horiz_sender_v3';
     const STORAGE_RECIPIENTS_KEY = 'parcel_saved_recipients_v2';
-    const STORAGE_GAS_URL_KEY = 'parcel_google_sheet_gas_url_v1';
-    const STORAGE_TOKEN_KEY = 'parcel_google_sheet_token_v1';
+    const STORAGE_TOKEN_KEY = 'parcel_sheet_pass_hash_v1'; // แฮชของรหัสผ่าน (ไม่เก็บรหัสจริง)
     const STORAGE_QUEUE_KEY = 'parcel_sync_queue_v1';
     const MIN_API_VERSION = 2;
+    // Web App ของ Apps Script ที่ผูกกับ Sheet "ฐานข้อมูลผู้รับพัสดุ" (ใครเห็น URL ก็ใช้ไม่ได้ถ้าไม่มีรหัสผ่าน)
+    const GAS_URL = 'https://script.google.com/macros/s/AKfycbwyqkV9kjcVqHu0MGvOckJD5mv9WemzINSJev8d1vKFP3K_LNRnDIxaDNJIo9cHfkGn/exec';
+    const PASSWORD_SALT = 'parcel-label:';
 
     let currentPaperSize = 'A5';
     let currentFontScale = 'md';
     let currentMarginPreset = 'tape';
     let currentRecPosition = 'bottom-right';
     let savedRecipients = [];
-    let gasWebAppUrl = '';
+    let gasWebAppUrl = '';       // = GAS_URL เมื่อเข้าระบบแล้ว, '' เมื่อยังไม่เข้า (ใช้แค่ในเครื่อง)
     let syncToken = '';
+    let typedPasswordHash = { pw: null, hash: '' }; // คำนวณล่วงหน้าตอนพิมพ์ ให้ปุ่มคัดลอกทำงานทันทีบน Safari
     let syncQueue = [];          // งานที่ยังไม่ได้ส่งขึ้น Sheet: {action:'upsert', recipient} | {action:'delete', id}
     let currentRecipientId = null; // id ของผู้รับที่เลือกมาจากรายชื่อ (แก้แล้วจะอัปเดตคนเดิม)
     let syncInFlight = null;
@@ -788,15 +802,15 @@ function reply(obj) {
     }
 
     // ==================== ระบบเชื่อม Google Sheets ====================
-    function generateToken() {
-      const bytes = new Uint8Array(18);
-      crypto.getRandomValues(bytes);
-      return Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+    async function hashPassword(pw) {
+      const bytes = new TextEncoder().encode(PASSWORD_SALT + pw);
+      const digest = await crypto.subtle.digest('SHA-256', bytes);
+      return Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, '0')).join('');
     }
 
     function loadGasConfig() {
-      gasWebAppUrl = (lsGet(STORAGE_GAS_URL_KEY) || '').trim();
       syncToken = (lsGet(STORAGE_TOKEN_KEY) || '').trim();
+      gasWebAppUrl = syncToken ? GAS_URL : '';
       try {
         const q = JSON.parse(lsGet(STORAGE_QUEUE_KEY) || '[]');
         syncQueue = Array.isArray(q) ? q : [];
@@ -805,6 +819,7 @@ function reply(obj) {
       }
       updateCloudStatusUI();
       if (gasWebAppUrl) syncNow(false);
+      else showLoginModal();
     }
 
     function persistQueue() {
@@ -837,7 +852,7 @@ function reply(obj) {
 
       if (!gasWebAppUrl) {
         dot.className = 'w-2 h-2 rounded-full bg-slate-300';
-        text.textContent = 'เก็บในเครื่อง (แตะปุ่ม Sheets เพื่อเชื่อม Cloud)';
+        text.textContent = 'ยังไม่ได้ใส่รหัสผ่าน (แตะปุ่ม Sheets) รายชื่อยังไม่ซิงค์';
         syncBtn.classList.add('hidden');
         return;
       }
@@ -854,6 +869,7 @@ function reply(obj) {
         dot.className = 'w-2 h-2 rounded-full bg-emerald-500';
         text.textContent = (customMsg || 'เชื่อมต่อ Google Sheets แล้ว') + pending;
       }
+      document.getElementById('accountStatus').textContent = text.textContent;
     }
 
     // เรียก Web App และตรวจผลจริง (ไม่ใช้ no-cors เพื่อให้รู้ว่าสำเร็จหรือไม่)
@@ -881,11 +897,17 @@ function reply(obj) {
         throw new Error('URL นี้ไม่ตอบกลับเป็นข้อมูล ตรวจว่า deploy เป็น Web app และตั้งสิทธิ์ Anyone');
       }
       if (!data || data.status !== 'ok') {
-        if (data && data.error === 'unauthorized') throw new Error('รหัสเชื่อมต่อไม่ตรงกับในสคริปต์');
+        if (data && data.error === 'unauthorized') {
+          const err = new Error('รหัสผ่านไม่ถูกต้อง');
+          err.code = 'unauthorized';
+          throw err;
+        }
         throw new Error('Google Sheets แจ้งข้อผิดพลาด: ' + ((data && data.error) || 'ไม่ทราบสาเหตุ'));
       }
       if (!(Number(data.version) >= MIN_API_VERSION)) {
-        throw new Error('สคริปต์ใน Sheet ยังเป็นเวอร์ชันเก่า ให้คัดลอกโค้ดใหม่ไปวางแล้ว deploy เป็น New version');
+        const err = new Error('สคริปต์ใน Sheet ยังเป็นเวอร์ชันเก่า ให้ทำตาม "ตั้งค่า Google Sheet ครั้งแรก" ด้านล่าง');
+        err.code = 'old_script';
+        throw err;
       }
       return data;
     }
@@ -902,11 +924,16 @@ function reply(obj) {
     }
 
     async function syncOnce() {
+      // ออกจากระบบระหว่างซิงค์ → ทิ้งผลลัพธ์ ไม่เขียนรายชื่อกลับลงเครื่อง
+      const tokenAtStart = syncToken;
+      const loggedOut = () => !gasWebAppUrl || syncToken !== tokenAtStart;
+
       // 1) ส่งงานที่ค้างขึ้นไปก่อน
       const sending = syncQueue.slice();
       if (sending.length) {
         updateCloudStatusUI('syncing', `กำลังส่ง ${sending.length} รายการขึ้น Google Sheets...`);
         await callApi('POST', { action: 'batch', ops: sending });
+        if (loggedOut()) return;
         syncQueue = syncQueue.filter(o => !sending.includes(o));
         persistQueue();
       }
@@ -914,6 +941,7 @@ function reply(obj) {
       // 2) ดึงรายชื่อทั้งหมดจาก Sheet มาเป็นตัวจริง (ลบที่เครื่องอื่นก็หายตามที่นี่ด้วย)
       updateCloudStatusUI('syncing', 'กำลังดึงรายชื่อล่าสุดจาก Google Sheets...');
       const data = await callApi('GET');
+      if (loggedOut()) return;
       let list = (Array.isArray(data.recipients) ? data.recipients : []).filter(r => r && r.id && (r.name || r.phone));
       // งานที่เพิ่งเกิดระหว่างซิงค์ ยังไม่ขึ้น Sheet ให้ทับลงไปก่อน
       syncQueue.forEach(op => { list = applyOp(list, op); });
@@ -942,8 +970,18 @@ function reply(obj) {
           } while (syncAgain);
           if (showNotification) showToast(`ซิงค์ Google Sheets สำเร็จ (${savedRecipients.length} รายชื่อ)`);
         } catch (err) {
-          updateCloudStatusUI('error', err.message);
-          if (showNotification) showToast(err.message);
+          if (err.code === 'unauthorized') {
+            // มีคนเปลี่ยนรหัสผ่านใน Sheet → ให้เครื่องนี้ใส่รหัสใหม่ (รายชื่อและงานค้างยังเก็บไว้)
+            syncToken = '';
+            gasWebAppUrl = '';
+            lsSet(STORAGE_TOKEN_KEY, '');
+            updateCloudStatusUI();
+            closeAccountModal();
+            showLoginModal('รหัสผ่านถูกเปลี่ยนแล้ว กรุณาใส่รหัสใหม่');
+          } else {
+            updateCloudStatusUI('error', err.message);
+            if (showNotification) showToast(err.message);
+          }
         } finally {
           syncInFlight = null;
         }
@@ -951,29 +989,113 @@ function reply(obj) {
       return syncInFlight;
     }
 
-    function openSheetConfigModal() {
-      document.getElementById('gasUrlInput').value = gasWebAppUrl;
-      document.getElementById('tokenInput').value = syncToken || generateToken();
-      document.getElementById('sheetConfigModal').classList.remove('hidden');
+    // ==================== เข้าใช้งานด้วยรหัสผ่าน ====================
+    function showLoginModal(message = '') {
+      const err = document.getElementById('loginError');
+      err.textContent = message;
+      err.classList.toggle('hidden', !message);
+      document.getElementById('loginModal').classList.remove('hidden');
+      lucide.createIcons();
+      setTimeout(() => document.getElementById('passwordInput').focus(), 50);
+    }
+
+    function hideLoginModal() {
+      document.getElementById('loginModal').classList.add('hidden');
+    }
+
+    function skipLogin() {
+      hideLoginModal();
+      updateCloudStatusUI();
+    }
+
+    // ปุ่ม Sheets บนหัวเว็บ: ยังไม่เข้าระบบ → ใส่รหัส, เข้าแล้ว → ดูสถานะ/ออกจากระบบ
+    function openAccountModal() {
+      if (!gasWebAppUrl) {
+        showLoginModal();
+        return;
+      }
+      document.getElementById('accountStatus').textContent = document.getElementById('cloudStatusText').textContent;
+      document.getElementById('accountModal').classList.remove('hidden');
       lucide.createIcons();
     }
 
-    function closeSheetConfigModal() {
-      document.getElementById('sheetConfigModal').classList.add('hidden');
+    function closeAccountModal() {
+      document.getElementById('accountModal').classList.add('hidden');
     }
 
-    function regenerateToken() {
-      if (syncToken && !confirm('สุ่มรหัสใหม่แล้วต้องคัดลอกโค้ด Apps Script ไปวางและ deploy ใหม่ และต้องใส่รหัสใหม่ในทุกเครื่อง ทำต่อไหม?')) return;
-      document.getElementById('tokenInput').value = generateToken();
+    function onPasswordInput() {
+      const pw = document.getElementById('passwordInput').value.trim();
+      document.getElementById('loginError').classList.add('hidden');
+      hashPassword(pw).then(hash => { typedPasswordHash = { pw, hash }; });
+    }
+
+    async function login() {
+      const pw = document.getElementById('passwordInput').value.trim();
+      const errBox = document.getElementById('loginError');
+      const btn = document.getElementById('loginBtn');
+      const fail = (msg) => { errBox.textContent = msg; errBox.classList.remove('hidden'); };
+      if (!pw) return fail('กรุณาใส่รหัสผ่าน');
+
+      btn.disabled = true;
+      btn.textContent = 'กำลังตรวจรหัส...';
+      const token = await hashPassword(pw);
+      gasWebAppUrl = GAS_URL;
+      syncToken = token;
+      try {
+        const data = await callApi('GET');
+        lsSet(STORAGE_TOKEN_KEY, token);
+        // รายชื่อที่มีแค่ในเครื่องนี้ (บันทึกไว้ก่อนเข้าระบบ) ส่งขึ้น Sheet ด้วย
+        const inSheet = new Set((data.recipients || []).map(r => r.id));
+        savedRecipients
+          .filter(r => !inSheet.has(r.id) && r.id !== 'demo_1')
+          .forEach(r => enqueue({ action: 'upsert', recipient: r }, false));
+        document.getElementById('passwordInput').value = '';
+        hideLoginModal();
+        await syncNow(true);
+      } catch (err) {
+        gasWebAppUrl = '';
+        syncToken = '';
+        if (err.code === 'old_script') document.getElementById('setupDetails').open = true;
+        fail(err.message);
+        updateCloudStatusUI();
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'เข้าใช้งาน';
+      }
+    }
+
+    function logout() {
+      const pending = syncQueue.length ? `\n\nยังมี ${syncQueue.length} รายการที่ยังไม่ได้ส่งขึ้น Sheet จะหายไปด้วย` : '';
+      if (!confirm('ออกจากระบบในเครื่องนี้?' + pending)) return;
+      syncToken = '';
+      gasWebAppUrl = '';
+      lsSet(STORAGE_TOKEN_KEY, '');
+      syncQueue = [];
+      persistQueue();
+      savedRecipients = [];
+      persistRecipients();
+      currentRecipientId = null;
+      closeAccountModal();
+      updateCloudStatusUI();
+      showLoginModal();
     }
 
     function copyAppsScriptCode() {
-      const tokenInput = document.getElementById('tokenInput');
-      if (!tokenInput.value.trim()) tokenInput.value = generateToken();
+      const pw = document.getElementById('passwordInput').value.trim();
+      if (pw.length < 6) {
+        showLoginModalError('ตั้งรหัสผ่านอย่างน้อย 6 ตัวก่อน แล้วค่อยกดคัดลอก');
+        return;
+      }
+      if (typedPasswordHash.pw !== pw) {
+        // ยังคำนวณแฮชไม่ทัน (เกิดได้ยากมาก) ให้กดอีกครั้ง
+        hashPassword(pw).then(hash => { typedPasswordHash = { pw, hash }; });
+        showLoginModalError('กดคัดลอกอีกครั้ง');
+        return;
+      }
       const code = document.getElementById('appsScriptTemplate').textContent.trim()
-        .replace('__TOKEN__', tokenInput.value.trim());
+        .replace('__TOKEN__', typedPasswordHash.hash);
 
-      const done = () => showToast('คัดลอกโค้ดแล้ว อย่าลืมกด "บันทึกและซิงค์" หลัง deploy');
+      const done = () => showToast('คัดลอกโค้ดแล้ว ไปวางใน Apps Script แล้ว deploy New version');
       if (navigator.clipboard && window.isSecureContext) {
         navigator.clipboard.writeText(code).then(done, () => fallbackCopy(code, done));
       } else {
@@ -996,58 +1118,10 @@ function reply(obj) {
       else showToast('คัดลอกไม่สำเร็จ ลองเปิดหน้านี้ด้วย Chrome/Safari');
     }
 
-    function saveGasUrlConfig() {
-      const url = document.getElementById('gasUrlInput').value.trim();
-      const token = document.getElementById('tokenInput').value.trim();
-
-      if (!url) {
-        gasWebAppUrl = '';
-        lsSet(STORAGE_GAS_URL_KEY, '');
-        syncQueue = [];
-        persistQueue();
-        updateCloudStatusUI();
-        closeSheetConfigModal();
-        showToast('ยกเลิกการเชื่อม Google Sheets แล้ว');
-        return;
-      }
-      if (!/^https:\/\/script\.google\.com\/.+\/exec$/.test(url)) {
-        showToast('URL ต้องขึ้นต้น https://script.google.com/ และลงท้าย /exec');
-        return;
-      }
-      if (token.length < 16) {
-        showToast('รหัสเชื่อมต่อสั้นเกินไป (อย่างน้อย 16 ตัว)');
-        return;
-      }
-
-      const wasConnected = !!gasWebAppUrl;
-      gasWebAppUrl = url;
-      syncToken = token;
-      lsSet(STORAGE_GAS_URL_KEY, url);
-      lsSet(STORAGE_TOKEN_KEY, token);
-      closeSheetConfigModal();
-
-      // เชื่อมครั้งแรก: ถามก่อนว่าจะเอารายชื่อในเครื่องขึ้น Sheet ไหม
-      // (เครื่องที่สองที่มีรายชื่อเก่าค้าง ถ้าส่งขึ้นไป รายชื่อที่ลบไปแล้วจะกลับมา)
-      if (!wasConnected && savedRecipients.length &&
-          confirm(`ส่งรายชื่อในเครื่องนี้ ${savedRecipients.length} รายการขึ้น Google Sheets ด้วยไหม?\n\nถ้ารายชื่อใน Sheet ครบอยู่แล้ว หรือเป็นเครื่องที่สอง ให้กด "ยกเลิก"`)) {
-        savedRecipients.forEach(r => enqueue({ action: 'upsert', recipient: r }, false));
-      }
-      updateCloudStatusUI();
-      syncNow(true);
-    }
-
-    function pushLocalToGoogleSheet() {
-      if (!gasWebAppUrl) {
-        showToast('กรุณาบันทึก Web App URL ก่อนครับ');
-        return;
-      }
-      if (savedRecipients.length === 0) {
-        showToast('ยังไม่มีรายชื่อในเครื่องให้ส่ง');
-        return;
-      }
-      savedRecipients.forEach(r => enqueue({ action: 'upsert', recipient: r }, false));
-      closeSheetConfigModal();
-      syncNow(true);
+    function showLoginModalError(msg) {
+      const err = document.getElementById('loginError');
+      err.textContent = msg;
+      err.classList.remove('hidden');
     }
 
     // ==================== ระบบผู้ส่ง & ผู้รับ ====================
