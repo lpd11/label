@@ -1,0 +1,1498 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>พิมพ์ใบปะหน้าพัสดุ</title>
+  <script src="https://cdn.tailwindcss.com/3.4.16"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+  <style>
+    * {
+      font-family: 'Sarabun', sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      background-color: #f1f5f9;
+      color: #0f172a;
+    }
+
+    /* อัตราส่วนกระดาษแนวนอนเสมอ (297:210 หรือ ~1.414:1) */
+    .paper-sheet {
+      background: #ffffff;
+      aspect-ratio: 297 / 210;
+      width: 100%;
+      position: relative;
+      box-sizing: border-box;
+      box-shadow: 0 12px 30px -8px rgba(15, 23, 42, 0.15), 0 4px 10px -3px rgba(15, 23, 42, 0.08);
+      border: 1px solid #cbd5e1;
+      transition: all 0.2s ease;
+      overflow: hidden;
+    }
+
+    /* เส้นประจำลองแนวติดเทปใส (แสดงเฉพาะหน้าจอ ไม่แสดงตอนปริ้น) */
+    .tape-guide-active::after {
+      content: 'แนวเขตปลอดภัย (เว้นขอบสำหรับติดเทปใส)';
+      position: absolute;
+      inset: var(--sheet-margin, 24px);
+      border: 1.5px dashed #93c5fd;
+      border-radius: 6px;
+      pointer-events: none;
+      font-size: 10px;
+      color: #60a5fa;
+      display: flex;
+      align-items: flex-start;
+      justify-content: flex-end;
+      padding: 4px 8px;
+      background: rgba(239, 246, 255, 0.15);
+    }
+
+    /* สไตล์สำหรับการสั่งพิมพ์ */
+    @media print {
+      html, body {
+        margin: 0 !important;
+        padding: 0 !important;
+        background: #ffffff !important;
+        width: 100% !important;
+        height: 100% !important;
+      }
+
+      .no-print {
+        display: none !important;
+      }
+
+      #appLayout, #previewPanel, #paperWrapper {
+        display: block !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
+        max-width: none !important;
+        background: transparent !important;
+      }
+
+      .paper-sheet {
+        box-shadow: none !important;
+        border: none !important;
+        width: 100vw !important;
+        height: 100vh !important;
+        aspect-ratio: auto !important;
+        page-break-after: avoid;
+        page-break-inside: avoid;
+      }
+
+      .tape-guide-active::after {
+        display: none !important;
+      }
+    }
+  </style>
+  <style id="dynamicPageRule">
+    @page {
+      size: A5 landscape;
+      margin: 0mm;
+    }
+  </style>
+</head>
+<body class="min-h-screen pb-28 lg:pb-10">
+
+  <!-- แถบหัวเว็บสำหรับมือถือและคอม -->
+  <header class="no-print sticky top-0 z-30 bg-white/95 backdrop-blur border-b border-slate-200 px-3 sm:px-4 py-2.5 shadow-sm">
+    <div class="max-w-6xl mx-auto flex items-center justify-between gap-2">
+      <div class="flex items-center gap-2 min-w-0">
+        <div class="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center text-white shadow-sm shrink-0">
+          <i data-lucide="printer" class="w-5 h-5"></i>
+        </div>
+        <div class="truncate">
+          <h1 class="text-sm sm:text-base font-bold text-slate-800 leading-tight truncate">พิมพ์ใบปะหน้าพัสดุ</h1>
+          <div class="flex items-center gap-1.5">
+            <span id="cloudStatusDot" class="w-2 h-2 rounded-full bg-slate-300"></span>
+            <p id="cloudStatusText" class="text-[11px] text-slate-500 truncate">เก็บในเครื่อง (ยังไม่ได้เชื่อม Sheets)</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-1.5 shrink-0">
+        <!-- ปุ่มตั้งค่า Google Sheets -->
+        <button onclick="openSheetConfigModal()" id="sheetConfigBtn"
+          class="flex items-center gap-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 px-2.5 py-1.5 rounded-xl text-xs font-bold transition">
+          <i data-lucide="sheet" class="w-4 h-4"></i>
+          <span class="hidden sm:inline">Google Sheets</span>
+          <span class="sm:hidden">Sheets</span>
+        </button>
+
+        <!-- ปุ่มสลับขนาด A5 / A4 แนวนอน -->
+        <div class="inline-flex bg-slate-100 p-1 rounded-xl border border-slate-200">
+          <button id="sizeBtnA5" onclick="setPaperSize('A5')"
+            class="px-2.5 py-1 rounded-lg text-xs font-bold transition bg-blue-600 text-white shadow-sm">
+            A5
+          </button>
+          <button id="sizeBtnA4" onclick="setPaperSize('A4')"
+            class="px-2.5 py-1 rounded-lg text-xs font-bold transition text-slate-600 hover:text-slate-900">
+            A4
+          </button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- แท็บสลับหน้าบนมือถือ -->
+  <div class="no-print lg:hidden max-w-xl mx-auto px-4 pt-3">
+    <div class="grid grid-cols-2 bg-slate-200/80 p-1 rounded-xl">
+      <button id="tabFormBtn" onclick="switchMobileView('form')"
+        class="flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold bg-white text-blue-600 shadow-sm transition">
+        <i data-lucide="pen-line" class="w-3.5 h-3.5"></i>
+        1. กรอกข้อมูล
+      </button>
+      <button id="tabPreviewBtn" onclick="switchMobileView('preview')"
+        class="flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold text-slate-600 transition">
+        <i data-lucide="eye" class="w-3.5 h-3.5"></i>
+        2. ดูตัวอย่าง / พิมพ์
+      </button>
+    </div>
+  </div>
+
+  <!-- โครงสร้างหลัก -->
+  <main id="appLayout" class="max-w-6xl mx-auto px-4 pt-3 lg:pt-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+
+    <!-- ฝั่งซ้าย: ฟอร์มกรอกข้อมูล -->
+    <section id="formPanel" class="no-print lg:col-span-5 space-y-4">
+
+      <!-- กล่องที่ 1: ข้อมูลผู้ส่ง -->
+      <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200/90 space-y-3">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-slate-700"></span>
+            <h2 class="text-sm font-bold text-slate-800">ข้อมูลผู้ส่ง (มุมซ้ายบน)</h2>
+          </div>
+          <span class="text-[11px] text-emerald-600 font-medium bg-emerald-50 px-2 py-0.5 rounded-full">จำค่าอัตโนมัติ</span>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">ชื่อผู้ส่ง</label>
+            <input id="senderName" type="text" value="ก้อย" oninput="onSenderChange()"
+              placeholder="เช่น ก้อย"
+              class="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">เบอร์โทรผู้ส่ง</label>
+            <input id="senderPhone" type="tel" value="0895528616" oninput="onSenderChange()"
+              placeholder="เช่น 0895528616"
+              class="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+          </div>
+        </div>
+      </div>
+
+      <!-- กล่องที่ 2: ข้อมูลผู้รับ + ค้นหาลูกค้าเก่า -->
+      <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200/90 space-y-3.5">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-blue-600"></span>
+            <h2 class="text-sm font-bold text-slate-800">ข้อมูลผู้รับ (ขวาล่าง)</h2>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <button onclick="syncNow(true)" id="manualSyncBtn" title="ซิงค์กับ Google Sheets ตอนนี้"
+              class="hidden text-xs text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2 py-1 rounded-lg font-bold flex items-center gap-1 transition">
+              <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+            </button>
+            <button onclick="openAddressBookModal()"
+              class="text-xs text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded-lg font-bold flex items-center gap-1 transition">
+              <i data-lucide="book-user" class="w-3.5 h-3.5"></i>
+              สมุดรายชื่อ (<span id="savedCountBadge">0</span>)
+            </button>
+            <button onclick="clearRecipient()"
+              class="text-xs text-rose-600 hover:text-rose-700 bg-rose-50 px-2 py-1 rounded-lg font-medium flex items-center gap-1">
+              <i data-lucide="eraser" class="w-3.5 h-3.5"></i> ล้าง
+            </button>
+          </div>
+        </div>
+
+        <!-- ช่องค้นหาลูกค้าเก่าจากชื่อ หรือ เบอร์โทร -->
+        <div class="relative">
+          <label class="block text-xs font-bold text-emerald-800 mb-1 flex items-center justify-between">
+            <span class="flex items-center gap-1">
+              <i data-lucide="search" class="w-3.5 h-3.5 text-emerald-600"></i>
+              ค้นหาผู้รับที่เคยบันทึกไว้ (พิมพ์ชื่อ หรือ เบอร์โทร)
+            </span>
+          </label>
+          <div class="relative">
+            <input id="customerSearchInput" type="text" autocomplete="off"
+              oninput="handleCustomerSearch(this.value)"
+              onfocus="handleCustomerSearch(this.value)"
+              placeholder="พิมพ์ชื่อลูกค้า หรือ เบอร์โทร เพื่อดึงข้อมูล..."
+              class="w-full pl-9 pr-8 py-2.5 rounded-xl border-2 border-emerald-300 bg-emerald-50/40 text-sm focus:bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none">
+            <i data-lucide="search" class="w-4 h-4 text-emerald-600 absolute left-3 top-3"></i>
+            <button id="clearSearchBtn" onclick="clearSearchDropdown()" class="hidden absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600">
+              <i data-lucide="circle-x" class="w-4 h-4"></i>
+            </button>
+          </div>
+
+          <!-- Dropdown ผลลัพธ์การค้นหา -->
+          <div id="searchResultsDropdown"
+            class="hidden absolute left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-xl z-40 max-h-60 overflow-y-auto divide-y divide-slate-100">
+          </div>
+        </div>
+
+        <!-- ช่องวางข้อความด่วนจากแชท -->
+        <div class="bg-blue-50/70 border border-blue-200/80 rounded-xl p-3 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-blue-900 flex items-center gap-1">
+              <i data-lucide="sparkles" class="w-3.5 h-3.5 text-blue-600"></i>
+              วางที่อยู่จากแชท LINE / Facebook (แยกอัตโนมัติ)
+            </span>
+          </div>
+          <textarea id="rawPasteBox" rows="2"
+            placeholder="วางข้อความชื่อ-ที่อยู่-เบอร์โทรทั้งหมดที่นี่..."
+            class="w-full px-2.5 py-1.5 rounded-lg border border-blue-200 text-xs bg-white focus:outline-none focus:border-blue-500 resize-none"></textarea>
+          <button onclick="smartParseAddress()"
+            class="w-full py-1.5 bg-blue-600 hover:bg-blue-700 active:scale-[0.99] text-white rounded-lg text-xs font-bold shadow-sm transition">
+            แยกชื่อ • เบอร์โทร • รหัสไปรษณีย์ ลงช่องทันที
+          </button>
+        </div>
+
+        <!-- ช่องกรอกแยกส่วน -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">ชื่อผู้รับ</label>
+            <input id="recName" type="text" oninput="updatePreview()"
+              placeholder="เช่น คุณสมชาย"
+              class="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">เบอร์โทรผู้รับ (อยู่ในวงเล็บ)</label>
+            <input id="recPhone" type="tel" oninput="updatePreview()"
+              placeholder="เช่น 081-2345678"
+              class="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">ที่อยู่ผู้รับ (ขึ้นบรรทัดใหม่ได้ตามต้องการ)</label>
+          <textarea id="recAddress" rows="3" oninput="updatePreview()"
+            placeholder="บ้านเลขที่ หมู่บ้าน ซอย ถนน&#10;ตำบล/แขวง อำเภอ/เขต จังหวัด"
+            class="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-blue-500 outline-none"></textarea>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">รหัสไปรษณีย์</label>
+          <input id="recZip" type="text" inputmode="numeric" maxlength="10" oninput="updatePreview()"
+            placeholder="เช่น 10250"
+            class="w-full px-3 py-2 rounded-xl border border-slate-300 text-base font-bold tracking-wider text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none">
+        </div>
+
+        <!-- ปุ่มบันทึกผู้รับเก็บไว้ -->
+        <div class="pt-1 flex items-center gap-2">
+          <button id="saveRecipientBtn" onclick="saveCurrentRecipient(true)"
+            class="flex-1 py-2.5 px-3 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white rounded-xl text-xs font-bold shadow-sm flex items-center justify-center gap-1.5 transition">
+            <i data-lucide="bookmark-plus" class="w-4 h-4"></i>
+            <span id="saveBtnText">บันทึกผู้รับคนนี้ไว้ใช้ครั้งหน้า</span>
+          </button>
+        </div>
+        <p class="text-[11px] text-slate-400 -mt-1">กดสั่งพิมพ์แล้วระบบจะบันทึกผู้รับให้อัตโนมัติด้วย ถ้าเลือกมาจากรายชื่อแล้วแก้ จะอัปเดตคนเดิม ไม่สร้างซ้ำ</p>
+      </div>
+
+      <!-- กล่องที่ 3: ปรับระยะขอบติดเทป & ตำแหน่งผู้รับ -->
+      <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200/90 space-y-3.5">
+        <div class="flex items-center justify-between">
+          <label class="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+            <i data-lucide="sliders-horizontal" class="w-4 h-4 text-blue-600"></i>
+            ตั้งค่าระยะขอบติดเทป & ตำแหน่ง
+          </label>
+          <label class="inline-flex items-center gap-1.5 cursor-pointer select-none">
+            <input type="checkbox" id="showTapeGuideToggle" checked onchange="updatePreview()" class="rounded text-blue-600 focus:ring-blue-500">
+            <span class="text-[11px] text-slate-500 font-medium">แสดงเส้นประแนวติดเทป</span>
+          </label>
+        </div>
+
+        <!-- เลือกระยะขอบกระดาษสำหรับติดเทป -->
+        <div>
+          <span class="block text-[11px] font-semibold text-slate-500 mb-1.5">1. เว้นระยะขอบกระดาษรอบด้าน (เผื่อติดเทปใส):</span>
+          <div class="grid grid-cols-3 gap-1.5 bg-slate-100 p-1 rounded-xl">
+            <button onclick="setMarginPreset('normal')" id="margin_normal" class="margin-btn py-1.5 rounded-lg text-xs font-semibold text-slate-600">ปกติ (1.6 ซม.)</button>
+            <button onclick="setMarginPreset('tape')" id="margin_tape" class="margin-btn py-1.5 rounded-lg text-xs font-bold bg-white text-blue-600 shadow-sm">กว้าง-ติดเทป (2.5 ซม.)</button>
+            <button onclick="setMarginPreset('extra')" id="margin_extra" class="margin-btn py-1.5 rounded-lg text-xs font-semibold text-slate-600">กว้างพิเศษ (3.2 ซม.)</button>
+          </div>
+        </div>
+
+        <!-- เลือกตำแหน่งบล็อกผู้รับ -->
+        <div>
+          <span class="block text-[11px] font-semibold text-slate-500 mb-1.5">2. ตำแหน่งส่วนของ "ผู้รับ":</span>
+          <div class="grid grid-cols-3 gap-1.5 bg-slate-100 p-1 rounded-xl">
+            <button onclick="setRecPosition('center-right')" id="pos_center-right" class="pos-btn py-1.5 rounded-lg text-xs font-semibold text-slate-600">กลางค่อนขวา</button>
+            <button onclick="setRecPosition('bottom-right')" id="pos_bottom-right" class="pos-btn py-1.5 rounded-lg text-xs font-bold bg-white text-blue-600 shadow-sm">ขวาล่าง (แนะนำ)</button>
+            <button onclick="setRecPosition('far-bottom-right')" id="pos_far-bottom-right" class="pos-btn py-1.5 rounded-lg text-xs font-semibold text-slate-600">ชิดขวาล่างสุด</button>
+          </div>
+        </div>
+
+        <!-- เลือกขนาดตัวอักษร -->
+        <div>
+          <span class="block text-[11px] font-semibold text-slate-500 mb-1.5">3. ขนาดตัวอักษรบนใบปะหน้า:</span>
+          <div class="grid grid-cols-4 gap-1.5 bg-slate-100 p-1 rounded-xl">
+            <button onclick="setFontScale('sm')" id="scale_sm" class="scale-btn py-1.5 rounded-lg text-xs font-semibold text-slate-600">เล็ก</button>
+            <button onclick="setFontScale('md')" id="scale_md" class="scale-btn py-1.5 rounded-lg text-xs font-bold bg-white text-blue-600 shadow-sm">กลาง</button>
+            <button onclick="setFontScale('lg')" id="scale_lg" class="scale-btn py-1.5 rounded-lg text-xs font-semibold text-slate-600">ใหญ่</button>
+            <button onclick="setFontScale('xl')" id="scale_xl" class="scale-btn py-1.5 rounded-lg text-xs font-semibold text-slate-600">ใหญ่พิเศษ</button>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ฝั่งขวา: ตัวอย่างใบปะหน้าแนวนอน -->
+    <section id="previewPanel" class="hidden lg:block lg:col-span-7 space-y-3">
+      <div class="no-print flex items-center justify-between px-1">
+        <div class="flex items-center gap-2">
+          <span class="inline-block w-2 h-2 rounded-full bg-emerald-500"></span>
+          <span id="paperIndicator" class="text-xs font-bold text-slate-700">ขนาดกระดาษ: A5 แนวนอน (210 × 148 มม.)</span>
+        </div>
+        <span class="text-[11px] text-slate-500">เว้นขอบติดเทปใสเรียบร้อย</span>
+      </div>
+
+      <!-- กระดาษแนวนอน -->
+      <div id="paperWrapper" class="w-full">
+        <div id="printableSheet" class="paper-sheet tape-guide-active flex flex-col justify-between text-slate-900">
+
+          <!-- โซนบนซ้าย: ผู้ส่ง -->
+          <div id="senderBlock" class="space-y-1">
+            <div id="lblSenderTitle" class="font-bold text-slate-800 leading-snug">ผู้ส่ง</div>
+            <div class="font-semibold text-slate-900 leading-snug tracking-wide">
+              <span id="outSenderName">ก้อย</span>
+              <span id="outSenderPhone" class="ml-3">0895528616</span>
+            </div>
+          </div>
+
+          <!-- โซนขวาล่าง: ผู้รับ -->
+          <div id="recipientOuterRow" class="w-full flex justify-end mt-auto">
+            <div id="recipientBlock" class="text-left space-y-1.5">
+              <div id="lblRecTitle" class="font-bold text-slate-800 leading-snug">ผู้รับ</div>
+
+              <div id="lblRecNameLine" class="font-bold text-slate-900 leading-snug">
+                <span id="outRecName">-</span>
+                <span id="outRecPhone" class="font-semibold ml-2"></span>
+              </div>
+
+              <div id="outRecAddress" class="font-medium text-slate-800 whitespace-pre-line leading-relaxed pt-0.5">-</div>
+
+              <div id="outRecZip" class="font-bold text-slate-900 tracking-widest pt-1 text-right pr-4"></div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- คำแนะนำการสั่งพิมพ์บนมือถือ -->
+      <div class="no-print bg-amber-50 border border-amber-200/80 rounded-xl p-3 text-xs text-amber-900 flex items-start gap-2.5">
+        <i data-lucide="info" class="w-4 h-4 text-amber-600 shrink-0 mt-0.5"></i>
+        <div class="space-y-0.5">
+          <p class="font-bold">เคล็ดลับเวลาสั่งพิมพ์บนโทรศัพท์มือถือ:</p>
+          <p class="text-amber-800">1. เส้นประสีฟ้าแสดงแนวเว้นขอบติดเทป (จะหายไปเองตอนพิมพ์จริง)</p>
+          <p class="text-amber-800">2. ในหน้าตั้งค่าเครื่องพิมพ์ของมือถือ ให้เลือกขนาดกระดาษเป็น <strong id="hintPaperSize">A5</strong> และวางแนวเป็น <strong>แนวนอน (Landscape)</strong></p>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Modal 1: สมุดรายชื่อผู้รับทั้งหมด -->
+  <div id="addressBookModal" class="no-print fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div class="bg-white w-full max-w-lg rounded-t-3xl sm:rounded-2xl shadow-2xl border border-slate-200 max-h-[85vh] flex flex-col overflow-hidden">
+      <div class="px-4 py-3.5 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+        <div class="flex items-center gap-2">
+          <i data-lucide="book-user" class="w-5 h-5 text-blue-600"></i>
+          <h3 class="text-sm font-bold text-slate-800">สมุดรายชื่อผู้รับที่บันทึกไว้</h3>
+        </div>
+        <button onclick="closeAddressBookModal()" class="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/60">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="p-3 border-b border-slate-100 bg-white">
+        <div class="relative">
+          <input id="modalSearchInput" type="text" oninput="renderAddressBookList(this.value)"
+            placeholder="ค้นหาจากชื่อ หรือ เบอร์โทรศัพท์..."
+            class="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+          <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-2.5"></i>
+        </div>
+      </div>
+
+      <div id="addressBookList" class="flex-1 overflow-y-auto divide-y divide-slate-100 p-2"></div>
+
+      <div class="p-3 border-t border-slate-200 bg-slate-50 flex items-center justify-between gap-2 text-xs">
+        <div class="flex items-center gap-1.5">
+          <button onclick="exportRecipientsJSON()" class="px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-100 font-semibold text-slate-700 flex items-center gap-1">
+            <i data-lucide="download" class="w-3.5 h-3.5"></i> สำรองไฟล์
+          </button>
+          <label class="px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-100 font-semibold text-slate-700 flex items-center gap-1 cursor-pointer">
+            <i data-lucide="upload" class="w-3.5 h-3.5"></i> นำเข้าไฟล์
+            <input type="file" accept=".json" onchange="importRecipientsJSON(event)" class="hidden">
+          </label>
+        </div>
+        <button onclick="closeAddressBookModal()" class="px-4 py-1.5 rounded-lg bg-slate-800 text-white font-bold">ปิดหน้าต่าง</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 2: ตั้งค่าเชื่อมต่อ Google Sheets -->
+  <div id="sheetConfigModal" class="no-print fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div class="bg-white w-full max-w-xl rounded-t-3xl sm:rounded-2xl shadow-2xl border border-slate-200 max-h-[90vh] flex flex-col overflow-hidden">
+      <div class="px-4 py-3.5 border-b border-slate-200 flex items-center justify-between bg-emerald-50">
+        <div class="flex items-center gap-2">
+          <i data-lucide="sheet" class="w-5 h-5 text-emerald-600"></i>
+          <h3 class="text-sm font-bold text-emerald-950">เชื่อมต่อฐานข้อมูล Google Sheets</h3>
+        </div>
+        <button onclick="closeSheetConfigModal()" class="p-1.5 rounded-lg text-slate-400 hover:text-slate-700">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="p-4 overflow-y-auto space-y-4 text-xs text-slate-700">
+        <div>
+          <label class="block font-bold text-slate-800 mb-1">1. Web App URL ที่ได้จาก Google Apps Script:</label>
+          <input id="gasUrlInput" type="url"
+            placeholder="https://script.google.com/macros/s/xxxxxx/exec"
+            class="w-full px-3 py-2.5 rounded-xl border border-slate-300 text-xs font-mono focus:ring-2 focus:ring-emerald-500 outline-none">
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-800 mb-1">2. รหัสเชื่อมต่อ (กันคนอื่นแอบอ่าน/แก้รายชื่อลูกค้า):</label>
+          <div class="flex items-center gap-1.5">
+            <input id="tokenInput" type="text" autocomplete="off" spellcheck="false"
+              class="flex-1 min-w-0 px-3 py-2.5 rounded-xl border border-slate-300 text-xs font-mono focus:ring-2 focus:ring-emerald-500 outline-none">
+            <button onclick="regenerateToken()" title="สุ่มรหัสใหม่"
+              class="px-2.5 py-2.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-slate-600 shrink-0">
+              <i data-lucide="key-round" class="w-4 h-4"></i>
+            </button>
+          </div>
+          <p class="text-[11px] text-slate-500 mt-1">รหัสนี้ฝังอยู่ในโค้ด Apps Script ที่คัดลอกไป เครื่องอื่นต้องใส่ URL และรหัสเดียวกันนี้ถึงจะซิงค์ได้</p>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <button onclick="saveGasUrlConfig()"
+            class="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-sm transition flex items-center justify-center gap-1.5">
+            <i data-lucide="circle-check" class="w-4 h-4"></i> บันทึกและซิงค์ทันที
+          </button>
+          <button onclick="pushLocalToGoogleSheet()"
+            class="py-2.5 px-3 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 font-bold rounded-xl transition">
+            ส่งรายชื่อในเครื่องขึ้น Sheet
+          </button>
+        </div>
+
+        <!-- วิธีสร้าง Google Sheet & โค้ด Apps Script -->
+        <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2">
+          <div class="flex items-center justify-between gap-2">
+            <span class="font-bold text-slate-800">ขั้นตอนตั้งค่า Google Sheets (ทำครั้งเดียว):</span>
+            <button onclick="copyAppsScriptCode()" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-[11px] font-bold flex items-center gap-1 shrink-0">
+              <i data-lucide="copy" class="w-3 h-3"></i> คัดลอกโค้ด Apps Script
+            </button>
+          </div>
+          <ol class="list-decimal list-inside space-y-1 text-slate-600 leading-relaxed">
+            <li>เปิดไฟล์ <strong>Google Sheets</strong> ที่จะใช้เก็บรายชื่อ</li>
+            <li>ไปที่เมนู <strong>ส่วนขยาย (Extensions) &gt; Apps Script</strong></li>
+            <li>ลบโค้ดเก่าออกทั้งหมด กดปุ่ม <strong>"คัดลอกโค้ด Apps Script"</strong> ด้านบนแล้วไปวางแทน กด Save</li>
+            <li><strong>ถ้ายังไม่เคย deploy:</strong> กด <strong>Deploy &gt; New deployment</strong> เลือกประเภท <strong>Web app</strong>, Execute as <strong>"Me"</strong>, Who has access <strong>"Anyone"</strong> แล้วกด Deploy (ครั้งแรกจะขออนุญาตสิทธิ์ ให้กดอนุญาต)</li>
+            <li><strong>ถ้าเคย deploy แล้ว:</strong> กด <strong>Deploy &gt; Manage deployments</strong> กดรูปดินสอ ตรง Version เลือก <strong>"New version"</strong> แล้วกด Deploy (URL เดิมใช้ต่อได้)</li>
+            <li>คัดลอก <strong>Web App URL</strong> มาวางในช่องที่ 1 แล้วกดบันทึก</li>
+          </ol>
+          <p class="text-[11px] text-slate-500">สคริปต์จะใช้แท็บชื่อ <strong>Recipients</strong> ถ้าไม่มี จะหาแท็บที่หัวคอลัมน์ A1 เป็น "ID" แล้วเปลี่ยนชื่อให้เอง</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- แจ้งเตือน Toast -->
+  <div id="toastAlert" class="no-print fixed top-16 left-1/2 -translate-x-1/2 z-50 hidden bg-slate-900 text-white px-4 py-2 rounded-full shadow-lg text-xs font-bold flex items-center gap-2 max-w-[90vw]">
+    <i data-lucide="circle-check" class="w-4 h-4 text-emerald-400 shrink-0"></i>
+    <span id="toastText">บันทึกเรียบร้อย</span>
+  </div>
+
+  <!-- แถบปุ่มสั่งพิมพ์ด้านล่าง -->
+  <div class="no-print fixed bottom-0 inset-x-0 z-30 bg-white/95 backdrop-blur border-t border-slate-200 p-3 shadow-lg">
+    <div class="max-w-6xl mx-auto flex items-center justify-between gap-3">
+      <div class="hidden sm:flex items-center gap-2 text-xs text-slate-600">
+        <span>ขนาดที่เลือก: <strong id="bottomSizeText" class="text-slate-900">A5 แนวนอน</strong></span>
+      </div>
+      <button onclick="switchMobileView('preview')" id="mobilePreviewQuickBtn"
+        class="lg:hidden py-3 px-4 rounded-xl border border-slate-300 text-slate-700 font-bold text-xs flex items-center justify-center gap-1.5">
+        <i data-lucide="eye" class="w-4 h-4"></i> ดูใบปะหน้า
+      </button>
+      <button onclick="handlePrint()"
+        class="flex-1 sm:flex-initial sm:min-w-[260px] py-3 px-6 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-[0.99] text-white font-bold text-sm shadow-md shadow-blue-600/25 flex items-center justify-center gap-2 transition">
+        <i data-lucide="printer" class="w-5 h-5"></i>
+        <span>สั่งพิมพ์ใบปะหน้า (<span id="printBtnSizeLabel">A5</span> แนวนอน)</span>
+      </button>
+    </div>
+  </div>
+
+  <!--
+    โค้ด Google Apps Script ที่ผู้ใช้คัดลอกไปวาง (__TOKEN__ จะถูกแทนด้วยรหัสเชื่อมต่อตอนกดคัดลอก)
+    เก็บเป็น text/plain เพื่อไม่ต้อง escape อะไรเลย
+  -->
+  <script type="text/plain" id="appsScriptTemplate">
+// ===== ฐานข้อมูลผู้รับพัสดุ (ใช้คู่กับหน้าเว็บพิมพ์ใบปะหน้า) =====
+var TOKEN = '__TOKEN__';
+var SHEET_NAME = 'Recipients';
+var HEADERS = ['ID', 'ชื่อผู้รับ', 'เบอร์โทรศัพท์', 'ที่อยู่', 'รหัสไปรษณีย์', 'อัปเดตล่าสุด'];
+var API_VERSION = 2;
+
+function doGet(e) {
+  if (!e || !e.parameter || e.parameter.token !== TOKEN) {
+    return reply({ status: 'error', error: 'unauthorized' });
+  }
+  var lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    var sheet = getOrCreateSheet();
+    var result = readAll(sheet);
+    if (result.changed) writeAll(sheet, result.list);
+    return reply({ status: 'ok', version: API_VERSION, recipients: result.list });
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function doPost(e) {
+  var payload;
+  try {
+    payload = JSON.parse(e.postData.contents);
+  } catch (err) {
+    return reply({ status: 'error', error: 'bad_json' });
+  }
+  if (!payload || payload.token !== TOKEN) {
+    return reply({ status: 'error', error: 'unauthorized' });
+  }
+  if (payload.action !== 'batch' || !Array.isArray(payload.ops)) {
+    return reply({ status: 'error', error: 'bad_request' });
+  }
+
+  var lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    var sheet = getOrCreateSheet();
+    var list = readAll(sheet).list;
+    var byId = {};
+    var order = [];
+    list.forEach(function (r) { byId[r.id] = r; order.push(r.id); });
+
+    payload.ops.forEach(function (op) {
+      if (op.action === 'delete' && op.id) {
+        delete byId[String(op.id)];
+      } else if (op.action === 'upsert' && op.recipient && op.recipient.id) {
+        var r = op.recipient;
+        var id = String(r.id);
+        var ts = Number(r.updatedAt) || Date.now();
+        var old = byId[id];
+        if (old && old.updatedAt > ts) return; // ข้อมูลใน Sheet ใหม่กว่า ไม่ทับ
+        if (!old) order.push(id);
+        byId[id] = {
+          id: id,
+          name: String(r.name || ''),
+          phone: String(r.phone || ''),
+          address: String(r.address || ''),
+          zip: String(r.zip || ''),
+          updatedAt: ts
+        };
+      }
+    });
+
+    var seen = {};
+    var result = [];
+    order.forEach(function (id) {
+      if (byId[id] && !seen[id]) { seen[id] = true; result.push(byId[id]); }
+    });
+    writeAll(sheet, result);
+    return reply({ status: 'ok', version: API_VERSION, count: result.length });
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function getOrCreateSheet() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEET_NAME);
+  if (!sheet) {
+    var sheets = ss.getSheets();
+    for (var i = 0; i < sheets.length; i++) {
+      if (String(sheets[i].getRange(1, 1).getValue()).trim() === 'ID') {
+        sheet = sheets[i];
+        sheet.setName(SHEET_NAME);
+        break;
+      }
+    }
+  }
+  if (!sheet) sheet = ss.insertSheet(SHEET_NAME);
+  if (String(sheet.getRange(1, 1).getValue()).trim() !== 'ID') {
+    if (sheet.getLastRow() > 0) sheet.insertRowBefore(1);
+    sheet.getRange(1, 1, 1, HEADERS.length).setValues([HEADERS]).setFontWeight('bold');
+    sheet.setFrozenRows(1);
+  }
+  // คอลัมน์ A-E เป็นข้อความล้วน เบอร์โทรจะได้ไม่หาย 0 นำหน้า
+  sheet.getRange('A:E').setNumberFormat('@');
+  sheet.getRange('F:F').setNumberFormat('dd/mm/yyyy hh:mm');
+  return sheet;
+}
+
+function readAll(sheet) {
+  var out = { list: [], changed: false };
+  var last = sheet.getLastRow();
+  if (last < 2) return out;
+  var values = sheet.getRange(2, 1, last - 1, 6).getValues();
+  var seen = {};
+  for (var i = 0; i < values.length; i++) {
+    var row = values[i];
+    if (!cellText(row[1]) && !cellText(row[2]) && !cellText(row[3]) && !cellText(row[4])) continue;
+    var id = cellText(row[0]);
+    if (!id || seen[id]) {
+      id = 'rec_' + Date.now() + '_' + i;
+      out.changed = true;
+    }
+    seen[id] = true;
+    var u = row[5];
+    var ts = u instanceof Date ? u.getTime() : (Number(u) || 0);
+    if (u !== '' && !(u instanceof Date)) out.changed = true; // แปลงตัวเลขเป็นวันที่ให้อ่านง่าย
+    out.list.push({
+      id: id,
+      name: cellText(row[1]),
+      phone: phoneText(row[2]),
+      address: cellText(row[3]),
+      zip: cellText(row[4]),
+      updatedAt: ts
+    });
+  }
+  return out;
+}
+
+function writeAll(sheet, list) {
+  var last = sheet.getLastRow();
+  if (last > 1) sheet.getRange(2, 1, last - 1, 6).clearContent();
+  if (!list.length) return;
+  var rows = list.map(function (r) {
+    return [r.id, r.name, r.phone, r.address, r.zip, r.updatedAt ? new Date(r.updatedAt) : ''];
+  });
+  sheet.getRange(2, 1, rows.length, 6).setValues(rows);
+}
+
+function cellText(v) {
+  if (v === null || v === undefined) return '';
+  return String(v).trim();
+}
+
+// เบอร์ที่เคยถูก Sheets แปลงเป็นตัวเลข (0812345678 -> 812345678) ให้เติม 0 คืน
+function phoneText(v) {
+  var s = cellText(v);
+  if (typeof v === 'number' && /^[1-9][0-9]{7,8}$/.test(s)) s = '0' + s;
+  return s;
+}
+
+function reply(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+</script>
+
+  <script>
+    const STORAGE_SENDER_KEY = 'parcel_horiz_sender_v3';
+    const STORAGE_RECIPIENTS_KEY = 'parcel_saved_recipients_v2';
+    const STORAGE_GAS_URL_KEY = 'parcel_google_sheet_gas_url_v1';
+    const STORAGE_TOKEN_KEY = 'parcel_google_sheet_token_v1';
+    const STORAGE_QUEUE_KEY = 'parcel_sync_queue_v1';
+    const MIN_API_VERSION = 2;
+
+    let currentPaperSize = 'A5';
+    let currentFontScale = 'md';
+    let currentMarginPreset = 'tape';
+    let currentRecPosition = 'bottom-right';
+    let savedRecipients = [];
+    let gasWebAppUrl = '';
+    let syncToken = '';
+    let syncQueue = [];          // งานที่ยังไม่ได้ส่งขึ้น Sheet: {action:'upsert', recipient} | {action:'delete', id}
+    let currentRecipientId = null; // id ของผู้รับที่เลือกมาจากรายชื่อ (แก้แล้วจะอัปเดตคนเดิม)
+    let syncInFlight = null;
+    let syncAgain = false;
+    let syncTimer = null;
+    let lastPullAt = 0;
+
+    const scaleConfig = {
+      sm: { senderTitle: 'text-base sm:text-lg', senderDetail: 'text-base sm:text-lg', recTitle: 'text-base sm:text-lg', recName: 'text-lg sm:text-xl', recAddr: 'text-sm sm:text-base', recZip: 'text-xl sm:text-2xl' },
+      md: { senderTitle: 'text-lg sm:text-xl', senderDetail: 'text-lg sm:text-xl', recTitle: 'text-lg sm:text-xl', recName: 'text-xl sm:text-2xl', recAddr: 'text-base sm:text-lg', recZip: 'text-2xl sm:text-3xl' },
+      lg: { senderTitle: 'text-xl sm:text-2xl', senderDetail: 'text-xl sm:text-2xl', recTitle: 'text-xl sm:text-2xl', recName: 'text-2xl sm:text-3xl', recAddr: 'text-lg sm:text-xl', recZip: 'text-3xl sm:text-4xl' },
+      xl: { senderTitle: 'text-2xl sm:text-3xl', senderDetail: 'text-2xl sm:text-3xl', recTitle: 'text-2xl sm:text-3xl', recName: 'text-3xl sm:text-4xl', recAddr: 'text-xl sm:text-2xl', recZip: 'text-4xl sm:text-5xl' }
+    };
+
+    const marginConfig = {
+      normal: { padClass: 'p-5 sm:p-8 print:p-[16mm]', cssVar: '18px' },
+      tape:   { padClass: 'p-7 sm:p-12 print:p-[25mm]', cssVar: '28px' },
+      extra:  { padClass: 'p-9 sm:p-16 print:p-[32mm]', cssVar: '38px' }
+    };
+
+    const recPosConfig = {
+      'center-right':     'w-[64%] sm:w-[58%] pr-4 pb-2',
+      'bottom-right':     'w-[58%] sm:w-[52%] pr-2 pb-0',
+      'far-bottom-right': 'w-[50%] sm:w-[45%] pr-0 pb-0'
+    };
+
+    window.addEventListener('DOMContentLoaded', () => {
+      lucide.createIcons();
+      loadSenderFromStorage();
+      loadRecipientsFromStorage();
+      loadGasConfig();
+      updatePreview();
+
+      document.addEventListener('click', (e) => {
+        const dropdown = document.getElementById('searchResultsDropdown');
+        const input = document.getElementById('customerSearchInput');
+        if (!dropdown.contains(e.target) && e.target !== input) {
+          dropdown.classList.add('hidden');
+        }
+      });
+
+      // กลับมาออนไลน์ หรือสลับกลับมาที่แท็บนี้ → ส่งงานค้าง + ดึงรายชื่อล่าสุด
+      window.addEventListener('online', () => syncNow(false));
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible' && (syncQueue.length || Date.now() - lastPullAt > 60000)) {
+          syncNow(false);
+        }
+      });
+    });
+
+    function lsGet(key) {
+      try { return localStorage.getItem(key); } catch (e) { return null; }
+    }
+
+    function lsSet(key, value) {
+      try { localStorage.setItem(key, value); } catch (e) {}
+    }
+
+    let toastTimer = null;
+    function showToast(message) {
+      const toast = document.getElementById('toastAlert');
+      document.getElementById('toastText').textContent = message;
+      toast.classList.remove('hidden');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toast.classList.add('hidden'), 3000);
+    }
+
+    function digitsOf(str) {
+      return String(str || '').replace(/\D/g, '');
+    }
+
+    // ==================== ระบบเชื่อม Google Sheets ====================
+    function generateToken() {
+      const bytes = new Uint8Array(18);
+      crypto.getRandomValues(bytes);
+      return Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+    }
+
+    function loadGasConfig() {
+      gasWebAppUrl = (lsGet(STORAGE_GAS_URL_KEY) || '').trim();
+      syncToken = (lsGet(STORAGE_TOKEN_KEY) || '').trim();
+      try {
+        const q = JSON.parse(lsGet(STORAGE_QUEUE_KEY) || '[]');
+        syncQueue = Array.isArray(q) ? q : [];
+      } catch (e) {
+        syncQueue = [];
+      }
+      updateCloudStatusUI();
+      if (gasWebAppUrl) syncNow(false);
+    }
+
+    function persistQueue() {
+      lsSet(STORAGE_QUEUE_KEY, JSON.stringify(syncQueue));
+    }
+
+    function opTargetId(op) {
+      return op.action === 'delete' ? op.id : op.recipient.id;
+    }
+
+    // ใส่งานลงคิว (งานใหม่ของ id เดียวกันแทนที่งานเก่า) แล้วนัดซิงค์
+    function enqueue(op, schedule = true) {
+      if (!gasWebAppUrl) return;
+      const id = opTargetId(op);
+      syncQueue = syncQueue.filter(o => opTargetId(o) !== id);
+      syncQueue.push(op);
+      persistQueue();
+      if (schedule) scheduleSync();
+    }
+
+    function scheduleSync() {
+      clearTimeout(syncTimer);
+      syncTimer = setTimeout(() => syncNow(false), 400);
+    }
+
+    function updateCloudStatusUI(state = 'idle', customMsg = '') {
+      const dot = document.getElementById('cloudStatusDot');
+      const text = document.getElementById('cloudStatusText');
+      const syncBtn = document.getElementById('manualSyncBtn');
+
+      if (!gasWebAppUrl) {
+        dot.className = 'w-2 h-2 rounded-full bg-slate-300';
+        text.textContent = 'เก็บในเครื่อง (แตะปุ่ม Sheets เพื่อเชื่อม Cloud)';
+        syncBtn.classList.add('hidden');
+        return;
+      }
+
+      syncBtn.classList.remove('hidden');
+      const pending = syncQueue.length ? ` • รอส่ง ${syncQueue.length} รายการ` : '';
+      if (state === 'syncing') {
+        dot.className = 'w-2 h-2 rounded-full bg-amber-400 animate-ping';
+        text.textContent = customMsg || 'กำลังซิงค์กับ Google Sheets...';
+      } else if (state === 'error') {
+        dot.className = 'w-2 h-2 rounded-full bg-rose-500';
+        text.textContent = (customMsg || 'ซิงค์ไม่สำเร็จ') + pending;
+      } else {
+        dot.className = 'w-2 h-2 rounded-full bg-emerald-500';
+        text.textContent = (customMsg || 'เชื่อมต่อ Google Sheets แล้ว') + pending;
+      }
+    }
+
+    // เรียก Web App และตรวจผลจริง (ไม่ใช้ no-cors เพื่อให้รู้ว่าสำเร็จหรือไม่)
+    async function callApi(method, body) {
+      let res;
+      try {
+        if (method === 'GET') {
+          const sep = gasWebAppUrl.includes('?') ? '&' : '?';
+          res = await fetch(`${gasWebAppUrl}${sep}token=${encodeURIComponent(syncToken)}&_=${Date.now()}`);
+        } else {
+          res = await fetch(gasWebAppUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({ ...body, token: syncToken })
+          });
+        }
+      } catch (e) {
+        throw new Error('ติดต่อ Google Sheets ไม่ได้ (เน็ตหลุด หรือ URL ผิด)');
+      }
+
+      let data;
+      try {
+        data = await res.json();
+      } catch (e) {
+        throw new Error('URL นี้ไม่ตอบกลับเป็นข้อมูล ตรวจว่า deploy เป็น Web app และตั้งสิทธิ์ Anyone');
+      }
+      if (!data || data.status !== 'ok') {
+        if (data && data.error === 'unauthorized') throw new Error('รหัสเชื่อมต่อไม่ตรงกับในสคริปต์');
+        throw new Error('Google Sheets แจ้งข้อผิดพลาด: ' + ((data && data.error) || 'ไม่ทราบสาเหตุ'));
+      }
+      if (!(Number(data.version) >= MIN_API_VERSION)) {
+        throw new Error('สคริปต์ใน Sheet ยังเป็นเวอร์ชันเก่า ให้คัดลอกโค้ดใหม่ไปวางแล้ว deploy เป็น New version');
+      }
+      return data;
+    }
+
+    function applyOp(list, op) {
+      if (op.action === 'delete') return list.filter(r => r.id !== op.id);
+      const idx = list.findIndex(r => r.id === op.recipient.id);
+      if (idx > -1) {
+        const copy = list.slice();
+        copy[idx] = op.recipient;
+        return copy;
+      }
+      return [op.recipient, ...list];
+    }
+
+    async function syncOnce() {
+      // 1) ส่งงานที่ค้างขึ้นไปก่อน
+      const sending = syncQueue.slice();
+      if (sending.length) {
+        updateCloudStatusUI('syncing', `กำลังส่ง ${sending.length} รายการขึ้น Google Sheets...`);
+        await callApi('POST', { action: 'batch', ops: sending });
+        syncQueue = syncQueue.filter(o => !sending.includes(o));
+        persistQueue();
+      }
+
+      // 2) ดึงรายชื่อทั้งหมดจาก Sheet มาเป็นตัวจริง (ลบที่เครื่องอื่นก็หายตามที่นี่ด้วย)
+      updateCloudStatusUI('syncing', 'กำลังดึงรายชื่อล่าสุดจาก Google Sheets...');
+      const data = await callApi('GET');
+      let list = (Array.isArray(data.recipients) ? data.recipients : []).filter(r => r && r.id && (r.name || r.phone));
+      // งานที่เพิ่งเกิดระหว่างซิงค์ ยังไม่ขึ้น Sheet ให้ทับลงไปก่อน
+      syncQueue.forEach(op => { list = applyOp(list, op); });
+      savedRecipients = list.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+      persistRecipients();
+      lastPullAt = Date.now();
+
+      if (!document.getElementById('addressBookModal').classList.contains('hidden')) {
+        renderAddressBookList(document.getElementById('modalSearchInput').value);
+      }
+      updateCloudStatusUI('ok', `ซิงค์ Google Sheets แล้ว (${savedRecipients.length} รายชื่อ)`);
+    }
+
+    function syncNow(showNotification = false) {
+      if (!gasWebAppUrl) return Promise.resolve();
+      clearTimeout(syncTimer);
+      if (syncInFlight) {
+        syncAgain = true;
+        return syncInFlight;
+      }
+      syncInFlight = (async () => {
+        try {
+          do {
+            syncAgain = false;
+            await syncOnce();
+          } while (syncAgain);
+          if (showNotification) showToast(`ซิงค์ Google Sheets สำเร็จ (${savedRecipients.length} รายชื่อ)`);
+        } catch (err) {
+          updateCloudStatusUI('error', err.message);
+          if (showNotification) showToast(err.message);
+        } finally {
+          syncInFlight = null;
+        }
+      })();
+      return syncInFlight;
+    }
+
+    function openSheetConfigModal() {
+      document.getElementById('gasUrlInput').value = gasWebAppUrl;
+      document.getElementById('tokenInput').value = syncToken || generateToken();
+      document.getElementById('sheetConfigModal').classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    function closeSheetConfigModal() {
+      document.getElementById('sheetConfigModal').classList.add('hidden');
+    }
+
+    function regenerateToken() {
+      if (syncToken && !confirm('สุ่มรหัสใหม่แล้วต้องคัดลอกโค้ด Apps Script ไปวางและ deploy ใหม่ และต้องใส่รหัสใหม่ในทุกเครื่อง ทำต่อไหม?')) return;
+      document.getElementById('tokenInput').value = generateToken();
+    }
+
+    function copyAppsScriptCode() {
+      const tokenInput = document.getElementById('tokenInput');
+      if (!tokenInput.value.trim()) tokenInput.value = generateToken();
+      const code = document.getElementById('appsScriptTemplate').textContent.trim()
+        .replace('__TOKEN__', tokenInput.value.trim());
+
+      const done = () => showToast('คัดลอกโค้ดแล้ว อย่าลืมกด "บันทึกและซิงค์" หลัง deploy');
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(code).then(done, () => fallbackCopy(code, done));
+      } else {
+        fallbackCopy(code, done);
+      }
+    }
+
+    function fallbackCopy(text, done) {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.setAttribute('readonly', '');
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      let ok = false;
+      try { ok = document.execCommand('copy'); } catch (e) {}
+      ta.remove();
+      if (ok) done();
+      else showToast('คัดลอกไม่สำเร็จ ลองเปิดหน้านี้ด้วย Chrome/Safari');
+    }
+
+    function saveGasUrlConfig() {
+      const url = document.getElementById('gasUrlInput').value.trim();
+      const token = document.getElementById('tokenInput').value.trim();
+
+      if (!url) {
+        gasWebAppUrl = '';
+        lsSet(STORAGE_GAS_URL_KEY, '');
+        syncQueue = [];
+        persistQueue();
+        updateCloudStatusUI();
+        closeSheetConfigModal();
+        showToast('ยกเลิกการเชื่อม Google Sheets แล้ว');
+        return;
+      }
+      if (!/^https:\/\/script\.google\.com\/.+\/exec$/.test(url)) {
+        showToast('URL ต้องขึ้นต้น https://script.google.com/ และลงท้าย /exec');
+        return;
+      }
+      if (token.length < 16) {
+        showToast('รหัสเชื่อมต่อสั้นเกินไป (อย่างน้อย 16 ตัว)');
+        return;
+      }
+
+      const wasConnected = !!gasWebAppUrl;
+      gasWebAppUrl = url;
+      syncToken = token;
+      lsSet(STORAGE_GAS_URL_KEY, url);
+      lsSet(STORAGE_TOKEN_KEY, token);
+      closeSheetConfigModal();
+
+      // เชื่อมครั้งแรก: ถามก่อนว่าจะเอารายชื่อในเครื่องขึ้น Sheet ไหม
+      // (เครื่องที่สองที่มีรายชื่อเก่าค้าง ถ้าส่งขึ้นไป รายชื่อที่ลบไปแล้วจะกลับมา)
+      if (!wasConnected && savedRecipients.length &&
+          confirm(`ส่งรายชื่อในเครื่องนี้ ${savedRecipients.length} รายการขึ้น Google Sheets ด้วยไหม?\n\nถ้ารายชื่อใน Sheet ครบอยู่แล้ว หรือเป็นเครื่องที่สอง ให้กด "ยกเลิก"`)) {
+        savedRecipients.forEach(r => enqueue({ action: 'upsert', recipient: r }, false));
+      }
+      updateCloudStatusUI();
+      syncNow(true);
+    }
+
+    function pushLocalToGoogleSheet() {
+      if (!gasWebAppUrl) {
+        showToast('กรุณาบันทึก Web App URL ก่อนครับ');
+        return;
+      }
+      if (savedRecipients.length === 0) {
+        showToast('ยังไม่มีรายชื่อในเครื่องให้ส่ง');
+        return;
+      }
+      savedRecipients.forEach(r => enqueue({ action: 'upsert', recipient: r }, false));
+      closeSheetConfigModal();
+      syncNow(true);
+    }
+
+    // ==================== ระบบผู้ส่ง & ผู้รับ ====================
+    function onSenderChange() {
+      const sender = {
+        name: document.getElementById('senderName').value,
+        phone: document.getElementById('senderPhone').value
+      };
+      lsSet(STORAGE_SENDER_KEY, JSON.stringify(sender));
+      updatePreview();
+    }
+
+    function loadSenderFromStorage() {
+      try {
+        const raw = lsGet(STORAGE_SENDER_KEY);
+        if (!raw) return;
+        const data = JSON.parse(raw);
+        if (data.name !== undefined) document.getElementById('senderName').value = data.name;
+        if (data.phone !== undefined) document.getElementById('senderPhone').value = data.phone;
+      } catch (e) {}
+    }
+
+    function loadRecipientsFromStorage() {
+      try {
+        const parsed = JSON.parse(lsGet(STORAGE_RECIPIENTS_KEY) || '[]');
+        savedRecipients = Array.isArray(parsed) ? parsed.filter(r => r && r.id) : [];
+      } catch (e) {
+        savedRecipients = [];
+      }
+      updateSavedBadge();
+    }
+
+    function persistRecipients() {
+      lsSet(STORAGE_RECIPIENTS_KEY, JSON.stringify(savedRecipients));
+      updateSavedBadge();
+    }
+
+    function updateSavedBadge() {
+      document.getElementById('savedCountBadge').textContent = savedRecipients.length;
+    }
+
+    // หาว่าข้อมูลในฟอร์มคือผู้รับคนไหนในรายชื่อ
+    // 1) ถ้าเลือกมาจากรายชื่อ และชื่อหรือเบอร์ยังตรงกับคนเดิม → คนเดิม (แก้ชื่อ/แก้เบอร์ได้โดยไม่สร้างซ้ำ)
+    // 2) ชื่อตรงกัน และเบอร์ตรงกัน (หรือไม่มีเบอร์ทั้งคู่) → คนเดิม
+    // 3) นอกนั้นถือเป็นคนใหม่
+    function findExistingIndex(name, cleanPhone) {
+      if (currentRecipientId) {
+        const idx = savedRecipients.findIndex(r => r.id === currentRecipientId);
+        if (idx > -1) {
+          const r = savedRecipients[idx];
+          if ((cleanPhone && digitsOf(r.phone) === cleanPhone) || r.name === name) return idx;
+        }
+      }
+      return savedRecipients.findIndex(r => r.name === name && digitsOf(r.phone) === cleanPhone);
+    }
+
+    function saveCurrentRecipient(showAlert = true) {
+      const name = document.getElementById('recName').value.trim();
+      const phone = document.getElementById('recPhone').value.trim();
+      const address = document.getElementById('recAddress').value.trim();
+      const zip = document.getElementById('recZip').value.trim();
+
+      if (!name && !phone) {
+        if (showAlert) showToast('กรุณากรอกชื่อหรือเบอร์โทรผู้รับก่อนบันทึก');
+        return;
+      }
+
+      const existingIndex = findExistingIndex(name, digitsOf(phone));
+      let targetRecord;
+      if (existingIndex > -1) {
+        const old = savedRecipients[existingIndex];
+        currentRecipientId = old.id;
+        if (old.name === name && old.phone === phone && old.address === address && old.zip === zip) {
+          if (showAlert) showToast(`"${name}" บันทึกไว้แล้ว ไม่มีอะไรเปลี่ยน`);
+          return;
+        }
+        targetRecord = { ...old, name, phone, address, zip, updatedAt: Date.now() };
+        savedRecipients.splice(existingIndex, 1);
+      } else {
+        targetRecord = {
+          id: 'rec_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+          name, phone, address, zip,
+          updatedAt: Date.now()
+        };
+      }
+      savedRecipients.unshift(targetRecord);
+      currentRecipientId = targetRecord.id;
+
+      persistRecipients();
+      enqueue({ action: 'upsert', recipient: targetRecord });
+
+      if (showAlert) {
+        showToast(existingIndex > -1 ? `อัปเดตข้อมูล "${name}" แล้ว` : `บันทึก "${name}" เป็นผู้รับใหม่แล้ว`);
+      }
+    }
+
+    // ค้นหาผู้รับจากชื่อ หรือ เบอร์โทร
+    function handleCustomerSearch(query) {
+      const dropdown = document.getElementById('searchResultsDropdown');
+      const clearBtn = document.getElementById('clearSearchBtn');
+      const q = (query || '').trim().toLowerCase();
+      const qDigits = q.replace(/\D/g, '');
+
+      if (q.length > 0) {
+        clearBtn.classList.remove('hidden');
+      } else {
+        clearBtn.classList.add('hidden');
+      }
+
+      const matches = savedRecipients.filter(item => {
+        if (!q) return true;
+        const nameMatch = (item.name || '').toLowerCase().includes(q);
+        const rawPhoneMatch = (item.phone || '').toLowerCase().includes(q);
+        const digitPhoneMatch = qDigits.length >= 2 && digitsOf(item.phone).includes(qDigits);
+        const addrMatch = (item.address || '').toLowerCase().includes(q);
+        return nameMatch || rawPhoneMatch || digitPhoneMatch || addrMatch;
+      }).slice(0, 8);
+
+      if (matches.length === 0) {
+        dropdown.innerHTML = `<div class="p-3 text-xs text-slate-400 text-center">ไม่พบรายชื่อหรือเบอร์โทรที่ค้นหา</div>`;
+        dropdown.classList.remove('hidden');
+        return;
+      }
+
+      dropdown.innerHTML = matches.map(item => `
+        <button type="button" data-id="${escapeHtml(item.id)}" onclick="selectSavedRecipient(this.dataset.id)"
+          class="w-full text-left px-3.5 py-2.5 hover:bg-emerald-50 active:bg-emerald-100 transition flex items-start justify-between gap-2">
+          <div class="min-w-0">
+            <div class="font-bold text-xs text-slate-900 truncate">${escapeHtml(item.name || '-')}</div>
+            <div class="text-[11px] text-slate-500 truncate">${escapeHtml(item.address || '')} ${escapeHtml(item.zip || '')}</div>
+          </div>
+          <span class="shrink-0 text-xs font-bold text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-md">
+            ${escapeHtml(item.phone || 'ไม่มีเบอร์')}
+          </span>
+        </button>
+      `).join('');
+
+      dropdown.classList.remove('hidden');
+    }
+
+    function clearSearchDropdown() {
+      document.getElementById('customerSearchInput').value = '';
+      document.getElementById('clearSearchBtn').classList.add('hidden');
+      document.getElementById('searchResultsDropdown').classList.add('hidden');
+    }
+
+    function selectSavedRecipient(id) {
+      const found = savedRecipients.find(item => item.id === id);
+      if (!found) return;
+
+      document.getElementById('recName').value = found.name || '';
+      document.getElementById('recPhone').value = found.phone || '';
+      document.getElementById('recAddress').value = found.address || '';
+      document.getElementById('recZip').value = found.zip || '';
+      currentRecipientId = found.id;
+
+      clearSearchDropdown();
+      closeAddressBookModal();
+      updatePreview();
+      showToast(`ดึงข้อมูล "${found.name}" แล้ว`);
+    }
+
+    function deleteSavedRecipient(id, event) {
+      if (event) event.stopPropagation();
+      const found = savedRecipients.find(item => item.id === id);
+      if (!found) return;
+      const where = gasWebAppUrl ? ' (จะลบออกจาก Google Sheets และทุกเครื่องด้วย)' : '';
+      if (!confirm(`ลบ "${found.name || found.phone}" ออกจากสมุดรายชื่อ?${where}`)) return;
+
+      savedRecipients = savedRecipients.filter(item => item.id !== id);
+      if (currentRecipientId === id) currentRecipientId = null;
+      persistRecipients();
+      enqueue({ action: 'delete', id });
+      renderAddressBookList(document.getElementById('modalSearchInput').value);
+      showToast('ลบรายชื่อเรียบร้อย');
+    }
+
+    function openAddressBookModal() {
+      document.getElementById('addressBookModal').classList.remove('hidden');
+      document.getElementById('modalSearchInput').value = '';
+      renderAddressBookList('');
+      lucide.createIcons();
+    }
+
+    function closeAddressBookModal() {
+      document.getElementById('addressBookModal').classList.add('hidden');
+    }
+
+    function renderAddressBookList(filterText = '') {
+      const container = document.getElementById('addressBookList');
+      const q = filterText.trim().toLowerCase();
+      const qDigits = q.replace(/\D/g, '');
+
+      const list = savedRecipients.filter(item => {
+        if (!q) return true;
+        return (item.name || '').toLowerCase().includes(q) ||
+               (item.phone || '').toLowerCase().includes(q) ||
+               (qDigits && digitsOf(item.phone).includes(qDigits)) ||
+               (item.address || '').toLowerCase().includes(q);
+      });
+
+      if (list.length === 0) {
+        container.innerHTML = `<div class="py-10 text-center text-xs text-slate-400">ยังไม่มีรายชื่อที่ตรงกับการค้นหา</div>`;
+        return;
+      }
+
+      container.innerHTML = list.map(item => `
+        <div data-id="${escapeHtml(item.id)}" onclick="selectSavedRecipient(this.dataset.id)"
+          class="p-3 rounded-xl hover:bg-blue-50/70 active:bg-blue-100/60 transition flex items-start justify-between gap-3 cursor-pointer">
+          <div class="space-y-0.5 min-w-0">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="font-bold text-sm text-slate-900">${escapeHtml(item.name || '-')}</span>
+              <span class="text-xs font-bold text-blue-700 bg-blue-100 px-2 py-0.5 rounded-md">${escapeHtml(item.phone || '-')}</span>
+            </div>
+            <p class="text-xs text-slate-600 line-clamp-2">${escapeHtml(item.address || '')} <strong>${escapeHtml(item.zip || '')}</strong></p>
+          </div>
+          <button data-id="${escapeHtml(item.id)}" onclick="deleteSavedRecipient(this.dataset.id, event)"
+            class="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg shrink-0">
+            <i data-lucide="trash-2" class="w-4 h-4"></i>
+          </button>
+        </div>
+      `).join('');
+
+      lucide.createIcons();
+    }
+
+    function exportRecipientsJSON() {
+      const blob = new Blob([JSON.stringify(savedRecipients, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'รายชื่อผู้รับพัสดุ.json';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+
+    function importRecipientsJSON(event) {
+      const file = event.target.files[0];
+      event.target.value = '';
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const imported = JSON.parse(e.target.result);
+          if (!Array.isArray(imported)) throw new Error('not array');
+          const clean = imported
+            .filter(r => r && (r.name || r.phone))
+            .map((r, i) => ({
+              id: String(r.id || ('rec_' + Date.now() + '_' + i)),
+              name: String(r.name || ''),
+              phone: String(r.phone || ''),
+              address: String(r.address || ''),
+              zip: String(r.zip || ''),
+              updatedAt: Number(r.updatedAt) || Date.now()
+            }));
+          // รวมกับของเดิม (id ซ้ำ = ทับด้วยของในไฟล์)
+          clean.forEach(r => {
+            savedRecipients = applyOp(savedRecipients, { action: 'upsert', recipient: r });
+            enqueue({ action: 'upsert', recipient: r }, false);
+          });
+          persistRecipients();
+          renderAddressBookList('');
+          if (gasWebAppUrl) syncNow(false);
+          showToast(`นำเข้า ${clean.length} รายชื่อสำเร็จ`);
+        } catch (err) {
+          showToast('ไฟล์ไม่ถูกต้อง');
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    function escapeHtml(str) {
+      return String(str).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+    }
+
+    function updatePreview() {
+      const sName = document.getElementById('senderName').value.trim();
+      const sPhone = document.getElementById('senderPhone').value.trim();
+      const rName = document.getElementById('recName').value.trim();
+      const rPhone = document.getElementById('recPhone').value.trim();
+      const rAddr = document.getElementById('recAddress').value;
+      const rZip = document.getElementById('recZip').value.trim();
+
+      document.getElementById('outSenderName').textContent = sName || '-';
+      document.getElementById('outSenderPhone').textContent = sPhone || '';
+
+      document.getElementById('outRecName').textContent = rName || '-';
+      if (rPhone) {
+        const cleanPhone = rPhone.startsWith('(') && rPhone.endsWith(')') ? rPhone : `(${rPhone})`;
+        document.getElementById('outRecPhone').textContent = cleanPhone;
+      } else {
+        document.getElementById('outRecPhone').textContent = '';
+      }
+
+      document.getElementById('outRecAddress').textContent = rAddr || '-';
+      document.getElementById('outRecZip').textContent = rZip || '';
+
+      const sheet = document.getElementById('printableSheet');
+      const mCfg = marginConfig[currentMarginPreset];
+      sheet.className = `paper-sheet flex flex-col justify-between text-slate-900 ${mCfg.padClass}`;
+      sheet.style.setProperty('--sheet-margin', mCfg.cssVar);
+
+      const showGuide = document.getElementById('showTapeGuideToggle').checked;
+      if (showGuide) sheet.classList.add('tape-guide-active');
+
+      const posClass = recPosConfig[currentRecPosition];
+      document.getElementById('recipientBlock').className = `text-left space-y-1.5 transition-all duration-200 ${posClass}`;
+
+      const cfg = scaleConfig[currentFontScale];
+      document.getElementById('lblSenderTitle').className = `font-bold text-slate-800 leading-snug ${cfg.senderTitle}`;
+      document.getElementById('outSenderName').parentElement.className = `font-semibold text-slate-900 leading-snug tracking-wide ${cfg.senderDetail}`;
+      document.getElementById('lblRecTitle').className = `font-bold text-slate-800 leading-snug ${cfg.recTitle}`;
+      document.getElementById('lblRecNameLine').className = `font-bold text-slate-900 leading-snug ${cfg.recName}`;
+      document.getElementById('outRecAddress').className = `font-medium text-slate-800 whitespace-pre-line leading-relaxed pt-0.5 ${cfg.recAddr}`;
+      document.getElementById('outRecZip').className = `font-bold text-slate-900 tracking-widest pt-1 text-right pr-4 ${cfg.recZip}`;
+    }
+
+    function setMarginPreset(preset) {
+      currentMarginPreset = preset;
+      ['normal', 'tape', 'extra'].forEach(p => {
+        const btn = document.getElementById('margin_' + p);
+        btn.className = p === preset
+          ? 'margin-btn py-1.5 rounded-lg text-xs font-bold bg-white text-blue-600 shadow-sm transition'
+          : 'margin-btn py-1.5 rounded-lg text-xs font-semibold text-slate-600 transition';
+      });
+      updatePreview();
+    }
+
+    function setRecPosition(pos) {
+      currentRecPosition = pos;
+      ['center-right', 'bottom-right', 'far-bottom-right'].forEach(p => {
+        const btn = document.getElementById('pos_' + p);
+        btn.className = p === pos
+          ? 'pos-btn py-1.5 rounded-lg text-xs font-bold bg-white text-blue-600 shadow-sm transition'
+          : 'pos-btn py-1.5 rounded-lg text-xs font-semibold text-slate-600 transition';
+      });
+      updatePreview();
+    }
+
+    function setPaperSize(size) {
+      currentPaperSize = size;
+      const btnA5 = document.getElementById('sizeBtnA5');
+      const btnA4 = document.getElementById('sizeBtnA4');
+
+      if (size === 'A5') {
+        btnA5.className = 'px-2.5 py-1 rounded-lg text-xs font-bold transition bg-blue-600 text-white shadow-sm';
+        btnA4.className = 'px-2.5 py-1 rounded-lg text-xs font-bold transition text-slate-600 hover:text-slate-900';
+        document.getElementById('paperIndicator').textContent = 'ขนาดกระดาษ: A5 แนวนอน (210 × 148 มม.)';
+      } else {
+        btnA4.className = 'px-2.5 py-1 rounded-lg text-xs font-bold transition bg-blue-600 text-white shadow-sm';
+        btnA5.className = 'px-2.5 py-1 rounded-lg text-xs font-bold transition text-slate-600 hover:text-slate-900';
+        document.getElementById('paperIndicator').textContent = 'ขนาดกระดาษ: A4 แนวนอน (297 × 210 มม.)';
+      }
+
+      document.getElementById('bottomSizeText').textContent = `${size} แนวนอน`;
+      document.getElementById('printBtnSizeLabel').textContent = size;
+      document.getElementById('hintPaperSize').textContent = size;
+      document.getElementById('dynamicPageRule').innerHTML = `@page { size: ${size} landscape; margin: 0mm; }`;
+    }
+
+    function setFontScale(scale) {
+      currentFontScale = scale;
+      ['sm', 'md', 'lg', 'xl'].forEach(key => {
+        const btn = document.getElementById('scale_' + key);
+        btn.className = key === scale
+          ? 'scale-btn py-1.5 rounded-lg text-xs font-bold bg-white text-blue-600 shadow-sm transition'
+          : 'scale-btn py-1.5 rounded-lg text-xs font-semibold text-slate-600 transition';
+      });
+      updatePreview();
+    }
+
+    function smartParseAddress() {
+      const raw = document.getElementById('rawPasteBox').value.trim();
+      if (!raw) return;
+
+      // ข้อความใหม่จากแชท = ผู้รับคนใหม่ ไม่ผูกกับคนที่เลือกไว้ก่อนหน้า
+      currentRecipientId = null;
+      document.getElementById('recName').value = '';
+      document.getElementById('recPhone').value = '';
+      document.getElementById('recAddress').value = '';
+      document.getElementById('recZip').value = '';
+
+      let working = raw;
+      const phoneRegex = /(0[68923457]\d[-.\s]?\d{3}[-.\s]?\d{3,4})/;
+      const phoneMatch = working.match(phoneRegex);
+      if (phoneMatch) {
+        document.getElementById('recPhone').value = phoneMatch[1].trim();
+        working = working.replace(phoneMatch[0], '');
+      }
+
+      const zipRegex = /\b([1-9]\d{4})\b/g;
+      const zipMatches = [...working.matchAll(zipRegex)];
+      if (zipMatches.length > 0) {
+        const lastZip = zipMatches[zipMatches.length - 1][1];
+        document.getElementById('recZip').value = lastZip;
+        working = working.replace(lastZip, '');
+      }
+
+      working = working.replace(/\(\s*\)/g, '').replace(/โทร\.?|เบอร์โทร\.?|Tel\.?/gi, '').trim();
+      const lines = working.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+
+      if (lines.length >= 2) {
+        document.getElementById('recName').value = lines[0];
+        document.getElementById('recAddress').value = lines.slice(1).join('\n');
+      } else if (lines.length === 1) {
+        const parts = lines[0].split(/\s+/);
+        if (parts.length >= 3) {
+          document.getElementById('recName').value = parts.slice(0, 2).join(' ');
+          document.getElementById('recAddress').value = parts.slice(2).join(' ');
+        } else {
+          document.getElementById('recName').value = lines[0];
+        }
+      }
+
+      document.getElementById('rawPasteBox').value = '';
+      updatePreview();
+    }
+
+    function clearRecipient() {
+      currentRecipientId = null;
+      document.getElementById('recName').value = '';
+      document.getElementById('recPhone').value = '';
+      document.getElementById('recAddress').value = '';
+      document.getElementById('recZip').value = '';
+      document.getElementById('rawPasteBox').value = '';
+      updatePreview();
+    }
+
+    function switchMobileView(view) {
+      const formPanel = document.getElementById('formPanel');
+      const previewPanel = document.getElementById('previewPanel');
+      const tabFormBtn = document.getElementById('tabFormBtn');
+      const tabPreviewBtn = document.getElementById('tabPreviewBtn');
+
+      if (view === 'preview') {
+        formPanel.classList.add('hidden');
+        previewPanel.classList.remove('hidden');
+        tabPreviewBtn.className = 'flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold bg-white text-blue-600 shadow-sm transition';
+        tabFormBtn.className = 'flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold text-slate-600 transition';
+      } else {
+        previewPanel.classList.add('hidden');
+        formPanel.classList.remove('hidden');
+        tabFormBtn.className = 'flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold bg-white text-blue-600 shadow-sm transition';
+        tabPreviewBtn.className = 'flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold text-slate-600 transition';
+      }
+    }
+
+    function handlePrint() {
+      saveCurrentRecipient(false);
+      updatePreview();
+      window.print();
+    }
+  </script>
+</body>
+</html>
