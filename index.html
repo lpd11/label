@@ -25,17 +25,62 @@
       container-type: inline-size;
     }
 
-    /* อัตราส่วนกระดาษแนวนอนเสมอ (297:210 หรือ ~1.414:1) */
-    .paper-sheet {
+    /* กระดาษ 1 แผ่น = 1 หน้าตอนพิมพ์ */
+    .sheet-page {
       background: #ffffff;
-      aspect-ratio: 297 / 210;
       width: 100%;
       position: relative;
       box-sizing: border-box;
       box-shadow: 0 12px 30px -8px rgba(15, 23, 42, 0.15), 0 4px 10px -3px rgba(15, 23, 42, 0.08);
       border: 1px solid #cbd5e1;
-      transition: all 0.2s ease;
       overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .sheet-page + .sheet-page {
+      margin-top: 16px;
+    }
+
+    /* ครึ่ง A4: A4 แนวตั้ง แบ่งบน-ล่าง ครึ่งละ 1 ใบ (210 × 148.5 มม. = ขนาด A5 แนวนอน) */
+    .mode-half .sheet-page {
+      aspect-ratio: 210 / 297;
+    }
+
+    .mode-half .label,
+    .mode-half .half-empty {
+      aspect-ratio: 210 / 148.5;
+    }
+
+    /* เส้นตัดกลางแผ่น (พิมพ์ออกด้วย ไว้ตัดกระดาษ) */
+    .mode-half .label + .label,
+    .mode-half .label + .half-empty {
+      border-top: 1px dashed #94a3b8;
+    }
+
+    /* A4 เต็ม: แนวนอน แผ่นละ 1 ใบ */
+    .mode-full .sheet-page {
+      aspect-ratio: 297 / 210;
+    }
+
+    .mode-full .label {
+      flex: 1;
+    }
+
+    .label {
+      position: relative;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .half-empty {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #94a3b8;
+      font-size: 13px;
     }
 
     /* เส้นประจำลองแนวติดเทปใส (แสดงเฉพาะหน้าจอ ไม่แสดงตอนปริ้น) */
@@ -79,14 +124,25 @@
         background: transparent !important;
       }
 
-      .paper-sheet {
+      .sheet-page {
         box-shadow: none !important;
         border: none !important;
+        margin: 0 !important;
         width: 100vw !important;
         height: 100vh !important;
         aspect-ratio: auto !important;
-        page-break-after: avoid;
-        page-break-inside: avoid;
+        break-inside: avoid;
+        break-after: page;
+      }
+
+      .sheet-page:last-child {
+        break-after: auto;
+      }
+
+      .mode-half .label,
+      .mode-half .half-empty {
+        height: 50vh !important;
+        aspect-ratio: auto !important;
       }
 
       .tape-guide-active::after {
@@ -96,7 +152,7 @@
   </style>
   <style id="dynamicPageRule">
     @page {
-      size: A5 landscape;
+      size: A4 portrait;
       margin: 0mm;
     }
   </style>
@@ -128,15 +184,15 @@
           <span class="sm:hidden">Sheets</span>
         </button>
 
-        <!-- ปุ่มสลับขนาด A5 / A4 แนวนอน -->
+        <!-- ปุ่มสลับ ครึ่ง A4 / A4 เต็ม -->
         <div class="inline-flex bg-slate-100 p-1 rounded-xl border border-slate-200">
-          <button id="sizeBtnA5" onclick="setPaperSize('A5')"
-            class="px-2.5 py-1 rounded-lg text-xs font-bold transition bg-blue-600 text-white shadow-sm">
-            A5
+          <button id="sizeBtnHalf" onclick="setPaperSize('half')"
+            class="px-2.5 py-1 rounded-lg text-xs font-bold transition bg-blue-600 text-white shadow-sm whitespace-nowrap">
+            ครึ่ง A4
           </button>
           <button id="sizeBtnA4" onclick="setPaperSize('A4')"
-            class="px-2.5 py-1 rounded-lg text-xs font-bold transition text-slate-600 hover:text-slate-900">
-            A4
+            class="px-2.5 py-1 rounded-lg text-xs font-bold transition text-slate-600 hover:text-slate-900 whitespace-nowrap">
+            A4 เต็ม
           </button>
         </div>
       </div>
@@ -214,6 +270,9 @@
             </button>
           </div>
         </div>
+
+        <!-- แท็บใบที่ 1 / ใบที่ 2 (ครึ่ง A4 = แผ่นละ 2 ใบ) -->
+        <div id="slotTabs" class="flex items-center gap-1.5 flex-wrap"></div>
 
         <!-- ช่องค้นหาลูกค้าเก่าจากชื่อ หรือ เบอร์โทร -->
         <div class="relative">
@@ -305,42 +364,13 @@
       <div class="no-print flex items-center justify-between px-1">
         <div class="flex items-center gap-2">
           <span class="inline-block w-2 h-2 rounded-full bg-emerald-500"></span>
-          <span id="paperIndicator" class="text-xs font-bold text-slate-700">ขนาดกระดาษ: A5 แนวนอน (210 × 148 มม.)</span>
+          <span id="paperIndicator" class="text-xs font-bold text-slate-700">ครึ่ง A4: พิมพ์บน A4 แนวตั้ง แผ่นละ 2 ใบ</span>
         </div>
         <span class="text-[11px] text-slate-500">เว้นขอบติดเทปใสเรียบร้อย</span>
       </div>
 
-      <!-- กระดาษแนวนอน -->
-      <div id="paperWrapper" class="w-full">
-        <div id="printableSheet" class="paper-sheet tape-guide-active flex flex-col justify-between text-slate-900">
-
-          <!-- โซนบนซ้าย: ผู้ส่ง -->
-          <div id="senderBlock" class="space-y-1">
-            <div id="lblSenderTitle" class="font-bold text-slate-800 leading-snug">ผู้ส่ง</div>
-            <div class="font-semibold text-slate-900 leading-snug tracking-wide">
-              <span id="outSenderName">ก้อย</span>
-              <span id="outSenderPhone" class="ml-3">0895528616</span>
-            </div>
-          </div>
-
-          <!-- โซนขวาล่าง: ผู้รับ -->
-          <div id="recipientOuterRow" class="w-full flex justify-end mt-auto">
-            <div id="recipientBlock" class="text-left space-y-1.5">
-              <div id="lblRecTitle" class="font-bold text-slate-800 leading-snug">ผู้รับ</div>
-
-              <div id="lblRecNameLine" class="font-bold text-slate-900 leading-snug">
-                <span id="outRecName">-</span>
-                <span id="outRecPhone" class="font-semibold whitespace-nowrap"></span>
-              </div>
-
-              <div id="outRecAddress" class="font-medium text-slate-800 whitespace-pre-line leading-relaxed pt-0.5">-</div>
-
-              <div id="outRecZip" class="font-bold text-slate-900 tracking-wider pt-0.5"></div>
-            </div>
-          </div>
-
-        </div>
-      </div>
+      <!-- กระดาษ: สร้างด้วย renderSheets() -->
+      <div id="paperWrapper" class="w-full mode-half text-slate-900"></div>
 
       <!-- ตั้งค่าระยะขอบ / ตำแหน่ง / ขนาดตัวอักษร (อยู่ใต้ใบปะหน้า ปรับแล้วเห็นผลทันที) -->
       <div class="no-print bg-white rounded-2xl p-4 shadow-sm border border-slate-200/90 space-y-3.5">
@@ -393,7 +423,8 @@
         <div class="space-y-0.5">
           <p class="font-bold">เคล็ดลับเวลาสั่งพิมพ์บนโทรศัพท์มือถือ:</p>
           <p class="text-amber-800">1. เส้นประสีฟ้าแสดงแนวเว้นขอบติดเทป (จะหายไปเองตอนพิมพ์จริง)</p>
-          <p class="text-amber-800">2. ในหน้าตั้งค่าเครื่องพิมพ์ของมือถือ ให้เลือกขนาดกระดาษเป็น <strong id="hintPaperSize">A5</strong> และวางแนวเป็น <strong>แนวนอน (Landscape)</strong></p>
+          <p class="text-amber-800">2. ในหน้าตั้งค่าเครื่องพิมพ์ ให้เลือกกระดาษ <strong>A4</strong> วางแนว <strong id="hintOrientation">แนวตั้ง (Portrait)</strong> และขนาด <strong>100% / ขนาดจริง</strong> (อย่าเลือก "พอดีหน้า / Fit")</p>
+          <p class="text-amber-800">3. ครึ่ง A4: ตัดกระดาษตามเส้นประกลางแผ่น จะได้ 2 ใบ</p>
         </div>
       </div>
     </section>
@@ -527,7 +558,7 @@
   <div class="no-print fixed bottom-0 inset-x-0 z-30 bg-white/95 backdrop-blur border-t border-slate-200 p-3 shadow-lg">
     <div class="max-w-6xl mx-auto flex items-center justify-between gap-3">
       <div class="hidden sm:flex items-center gap-2 text-xs text-slate-600">
-        <span>ขนาดที่เลือก: <strong id="bottomSizeText" class="text-slate-900">A5 แนวนอน</strong></span>
+        <span>ขนาดที่เลือก: <strong id="bottomSizeText" class="text-slate-900">ครึ่ง A4</strong></span>
       </div>
       <button onclick="switchMobileView('preview')" id="mobilePreviewQuickBtn"
         class="lg:hidden py-3 px-4 rounded-xl border border-slate-300 text-slate-700 font-bold text-xs flex items-center justify-center gap-1.5">
@@ -536,7 +567,7 @@
       <button onclick="handlePrint()"
         class="flex-1 sm:flex-initial sm:min-w-[260px] py-3 px-6 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-[0.99] text-white font-bold text-sm shadow-md shadow-blue-600/25 flex items-center justify-center gap-2 transition">
         <i data-lucide="printer" class="w-5 h-5"></i>
-        <span>สั่งพิมพ์ใบปะหน้า (<span id="printBtnSizeLabel">A5</span> แนวนอน)</span>
+        <span>สั่งพิมพ์ใบปะหน้า (<span id="printBtnSizeLabel">ครึ่ง A4</span>)</span>
       </button>
     </div>
   </div>
@@ -717,7 +748,10 @@ function reply(obj) {
     const GAS_URL = 'https://script.google.com/macros/s/AKfycbwyqkV9kjcVqHu0MGvOckJD5mv9WemzINSJev8d1vKFP3K_LNRnDIxaDNJIo9cHfkGn/exec';
     const PASSWORD_SALT = 'parcel-label:';
 
-    let currentPaperSize = 'A5';
+    const STORAGE_PAPER_KEY = 'parcel_paper_mode_v1';
+    let currentPaperSize = 'half';
+    let labels = [emptyLabel()];  // ใบปะหน้าที่จะพิมพ์ (สูงสุด 2 ใบ)
+    let activeSlot = 0;
     let currentFontScale = 'md';
     let currentMarginPreset = 'tape';
     let currentRecPosition = 'bottom-right';
@@ -746,9 +780,6 @@ function reply(obj) {
       tape:   { mm: 25 },
       extra:  { mm: 32 }
     };
-
-    const paperWidthMm = { A5: 210, A4: 297 };
-
     const recPosConfig = {
       'center-right':     'w-[64%] sm:w-[58%] pr-4 pb-2',
       'bottom-right':     'w-[58%] sm:w-[52%] pr-2 pb-0',
@@ -760,7 +791,7 @@ function reply(obj) {
       loadSenderFromStorage();
       loadRecipientsFromStorage();
       loadGasConfig();
-      updatePreview();
+      setPaperSize(lsGet(STORAGE_PAPER_KEY) || 'half');
 
       document.addEventListener('click', (e) => {
         const dropdown = document.getElementById('searchResultsDropdown');
@@ -1398,52 +1429,128 @@ function reply(obj) {
       return String(str).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
     }
 
+    // ==================== ใบที่ 1 / ใบที่ 2 ====================
+    // ฟอร์มแสดงข้อมูลของใบที่เลือกอยู่ (activeSlot) เสมอ ส่วนใบอื่นเก็บไว้ใน labels
+    function emptyLabel() {
+      return { name: '', phone: '', address: '', zip: '', recipientId: null };
+    }
+
+    function readForm() {
+      return {
+        name: document.getElementById('recName').value.trim(),
+        phone: document.getElementById('recPhone').value.trim(),
+        address: document.getElementById('recAddress').value,
+        zip: document.getElementById('recZip').value.trim(),
+        recipientId: currentRecipientId
+      };
+    }
+
+    function writeForm(l) {
+      document.getElementById('recName').value = l.name || '';
+      document.getElementById('recPhone').value = l.phone || '';
+      document.getElementById('recAddress').value = l.address || '';
+      document.getElementById('recZip').value = l.zip || '';
+      currentRecipientId = l.recipientId || null;
+    }
+
+    function switchSlot(i) {
+      if (i === activeSlot || !labels[i]) return;
+      labels[activeSlot] = readForm();
+      activeSlot = i;
+      writeForm(labels[i]);
+      clearSearchDropdown();
+      updatePreview();
+    }
+
+    function addSlot() {
+      if (labels.length >= 2) return;
+      labels[activeSlot] = readForm();
+      labels.push(emptyLabel());
+      switchSlot(labels.length - 1);
+      document.getElementById('customerSearchInput').focus();
+    }
+
+    function removeSlot(i) {
+      labels[activeSlot] = readForm();
+      labels.splice(i, 1);
+      activeSlot = 0;
+      writeForm(labels[0]);
+      updatePreview();
+    }
+
+    function renderSlotTabs() {
+      const base = 'px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1 max-w-[48%]';
+      const tabs = labels.map((l, i) => {
+        const cls = i === activeSlot
+          ? `${base} bg-blue-600 text-white shadow-sm`
+          : `${base} bg-slate-100 text-slate-600 hover:bg-slate-200`;
+        const who = l.name ? `: ${escapeHtml(l.name)}` : '';
+        const remove = i > 0
+          ? `<span onclick="event.stopPropagation(); removeSlot(${i})" title="ลบใบนี้" class="ml-1 px-1 rounded hover:bg-black/20">✕</span>`
+          : '';
+        return `<button type="button" onclick="switchSlot(${i})" class="${cls}"><span class="truncate">ใบที่ ${i + 1}${who}</span>${remove}</button>`;
+      }).join('');
+      const add = labels.length < 2
+        ? `<button type="button" onclick="addSlot()" class="px-3 py-1.5 rounded-lg text-xs font-bold border border-dashed border-blue-300 text-blue-600 hover:bg-blue-50 transition">+ เพิ่มผู้รับคนที่ 2</button>`
+        : '';
+      document.getElementById('slotTabs').innerHTML = tabs + add;
+    }
+
     function updatePreview() {
+      labels[activeSlot] = readForm();
+      renderSlotTabs();
+      renderSheets();
+    }
+
+    function renderSheets() {
+      const half = currentPaperSize === 'half';
       const sName = document.getElementById('senderName').value.trim();
       const sPhone = document.getElementById('senderPhone').value.trim();
-      const rName = document.getElementById('recName').value.trim();
-      const rPhone = document.getElementById('recPhone').value.trim();
-      const rAddr = document.getElementById('recAddress').value;
-      const rZip = document.getElementById('recZip').value.trim();
 
-      document.getElementById('outSenderName').textContent = sName || '-';
-      document.getElementById('outSenderPhone').textContent = sPhone || '';
-
-      document.getElementById('outRecName').textContent = rName || '-';
-      if (rPhone) {
-        const cleanPhone = rPhone.startsWith('(') && rPhone.endsWith(')') ? rPhone : `(${rPhone})`;
-        document.getElementById('outRecPhone').textContent = cleanPhone;
-      } else {
-        document.getElementById('outRecPhone').textContent = '';
-      }
-
-      document.getElementById('outRecAddress').textContent = rAddr || '-';
-      document.getElementById('outRecZip').textContent = rZip || '';
-
-      // แปลง มม./pt บนกระดาษ → cqw (% ของความกว้างกระดาษ)
-      const widthMm = paperWidthMm[currentPaperSize];
+      // แปลง มม./pt บนกระดาษ → cqw (% ของความกว้างกระดาษ) ครึ่ง A4 กว้าง 210 มม., A4 แนวนอนกว้าง 297 มม.
+      const widthMm = half ? 210 : 297;
       const mmToCq = mm => `${(mm / widthMm * 100).toFixed(3)}cqw`;
       const ptToCq = pt => mmToCq(pt * 25.4 / 72);
-
-      const sheet = document.getElementById('printableSheet');
       const marginCq = mmToCq(marginConfig[currentMarginPreset].mm);
-      sheet.className = 'paper-sheet flex flex-col justify-between text-slate-900';
-      sheet.style.padding = marginCq;
-      sheet.style.setProperty('--sheet-margin', marginCq);
-
-      const showGuide = document.getElementById('showTapeGuideToggle').checked;
-      if (showGuide) sheet.classList.add('tape-guide-active');
-
+      const guide = document.getElementById('showTapeGuideToggle').checked ? 'tape-guide-active' : '';
       const posClass = recPosConfig[currentRecPosition];
-      document.getElementById('recipientBlock').className = `text-left space-y-1.5 transition-all duration-200 ${posClass}`;
-
       const cfg = scaleConfig[currentFontScale];
-      document.getElementById('lblSenderTitle').style.fontSize = ptToCq(cfg.senderTitle);
-      document.getElementById('outSenderName').parentElement.style.fontSize = ptToCq(cfg.senderDetail);
-      document.getElementById('lblRecTitle').style.fontSize = ptToCq(cfg.recTitle);
-      document.getElementById('lblRecNameLine').style.fontSize = ptToCq(cfg.recName);
-      document.getElementById('outRecAddress').style.fontSize = ptToCq(cfg.recAddr);
-      document.getElementById('outRecZip').style.fontSize = ptToCq(cfg.recZip);
+      const fs = key => `font-size:${ptToCq(cfg[key])}`;
+
+      const labelHtml = (l) => {
+        const phone = l.phone
+          ? (l.phone.startsWith('(') && l.phone.endsWith(')') ? l.phone : `(${l.phone})`)
+          : '';
+        return `
+          <div class="label ${guide}" style="padding:${marginCq};--sheet-margin:${marginCq}">
+            <div class="space-y-1">
+              <div class="font-bold text-slate-800 leading-snug" style="${fs('senderTitle')}">ผู้ส่ง</div>
+              <div class="font-semibold text-slate-900 leading-snug tracking-wide" style="${fs('senderDetail')}">${escapeHtml(sName || '-')}<span class="ml-3">${escapeHtml(sPhone)}</span></div>
+            </div>
+            <div class="w-full flex justify-end mt-auto">
+              <div class="text-left space-y-1.5 ${posClass}">
+                <div class="font-bold text-slate-800 leading-snug" style="${fs('recTitle')}">ผู้รับ</div>
+                <div class="font-bold text-slate-900 leading-snug" style="${fs('recName')}">${escapeHtml(l.name || '-')} <span class="font-semibold whitespace-nowrap">${escapeHtml(phone)}</span></div>
+                <div class="font-medium text-slate-800 whitespace-pre-line leading-relaxed pt-0.5" style="${fs('recAddr')}">${escapeHtml(l.address || '-')}</div>
+                <div class="font-bold text-slate-900 tracking-wider pt-0.5" style="${fs('recZip')}">${escapeHtml(l.zip || '')}</div>
+              </div>
+            </div>
+          </div>`;
+      };
+
+      let html;
+      if (half) {
+        const bottom = labels[1]
+          ? labelHtml(labels[1])
+          : `<div class="half-empty"><span class="no-print px-6 text-center">ครึ่งล่างว่าง กด "+ เพิ่มผู้รับคนที่ 2" เพื่อพิมพ์ 2 ใบในแผ่นเดียว</span></div>`;
+        html = `<div class="sheet-page">${labelHtml(labels[0])}${bottom}</div>`;
+      } else {
+        html = labels.map(l => `<div class="sheet-page">${labelHtml(l)}</div>`).join('');
+      }
+
+      const wrapper = document.getElementById('paperWrapper');
+      wrapper.className = `w-full text-slate-900 ${half ? 'mode-half' : 'mode-full'}`;
+      wrapper.innerHTML = html;
     }
 
     function setMarginPreset(preset) {
@@ -1468,25 +1575,26 @@ function reply(obj) {
       updatePreview();
     }
 
+    // 'half' = ครึ่ง A4 (A4 แนวตั้ง แผ่นละ 2 ใบ), 'A4' = A4 แนวนอนเต็มแผ่น
     function setPaperSize(size) {
-      currentPaperSize = size;
-      const btnA5 = document.getElementById('sizeBtnA5');
-      const btnA4 = document.getElementById('sizeBtnA4');
+      currentPaperSize = size === 'A4' ? 'A4' : 'half';
+      const half = currentPaperSize === 'half';
+      lsSet(STORAGE_PAPER_KEY, currentPaperSize);
 
-      if (size === 'A5') {
-        btnA5.className = 'px-2.5 py-1 rounded-lg text-xs font-bold transition bg-blue-600 text-white shadow-sm';
-        btnA4.className = 'px-2.5 py-1 rounded-lg text-xs font-bold transition text-slate-600 hover:text-slate-900';
-        document.getElementById('paperIndicator').textContent = 'ขนาดกระดาษ: A5 แนวนอน (210 × 148 มม.)';
-      } else {
-        btnA4.className = 'px-2.5 py-1 rounded-lg text-xs font-bold transition bg-blue-600 text-white shadow-sm';
-        btnA5.className = 'px-2.5 py-1 rounded-lg text-xs font-bold transition text-slate-600 hover:text-slate-900';
-        document.getElementById('paperIndicator').textContent = 'ขนาดกระดาษ: A4 แนวนอน (297 × 210 มม.)';
-      }
+      const on = 'px-2.5 py-1 rounded-lg text-xs font-bold transition bg-blue-600 text-white shadow-sm whitespace-nowrap';
+      const off = 'px-2.5 py-1 rounded-lg text-xs font-bold transition text-slate-600 hover:text-slate-900 whitespace-nowrap';
+      document.getElementById('sizeBtnHalf').className = half ? on : off;
+      document.getElementById('sizeBtnA4').className = half ? off : on;
 
-      document.getElementById('bottomSizeText').textContent = `${size} แนวนอน`;
-      document.getElementById('printBtnSizeLabel').textContent = size;
-      document.getElementById('hintPaperSize').textContent = size;
-      document.getElementById('dynamicPageRule').innerHTML = `@page { size: ${size} landscape; margin: 0mm; }`;
+      document.getElementById('paperIndicator').textContent = half
+        ? 'ครึ่ง A4: พิมพ์บน A4 แนวตั้ง แผ่นละ 2 ใบ (ใบละ 210 × 148 มม.)'
+        : 'A4 เต็ม: แนวนอน แผ่นละ 1 ใบ (297 × 210 มม.)';
+      const label = half ? 'ครึ่ง A4' : 'A4 เต็ม';
+      document.getElementById('bottomSizeText').textContent = label;
+      document.getElementById('printBtnSizeLabel').textContent = label;
+      document.getElementById('hintOrientation').textContent = half ? 'แนวตั้ง (Portrait)' : 'แนวนอน (Landscape)';
+      document.getElementById('dynamicPageRule').innerHTML =
+        `@page { size: A4 ${half ? 'portrait' : 'landscape'}; margin: 0mm; }`;
       updatePreview();
     }
 
@@ -1548,6 +1656,7 @@ function reply(obj) {
       updatePreview();
     }
 
+    // ล้างเฉพาะใบที่เลือกอยู่
     function clearRecipient() {
       currentRecipientId = null;
       document.getElementById('recName').value = '';
@@ -1578,7 +1687,16 @@ function reply(obj) {
     }
 
     function handlePrint() {
-      saveCurrentRecipient(false);
+      // บันทึกผู้รับทุกใบลงสมุดรายชื่อ แล้วกลับมาที่ใบที่เลือกอยู่
+      labels[activeSlot] = readForm();
+      const keep = activeSlot;
+      labels.forEach((l, i) => {
+        writeForm(l);
+        saveCurrentRecipient(false);
+        labels[i] = readForm();
+      });
+      activeSlot = keep;
+      writeForm(labels[keep]);
       updatePreview();
       window.print();
     }
