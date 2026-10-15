@@ -20,6 +20,11 @@
       color: #0f172a;
     }
 
+    /* ขนาดตัวอักษร/ขอบบนกระดาษใช้หน่วย cqw (อิงความกว้างกระดาษ) หน้าจอกับตอนพิมพ์จึงสัดส่วนเท่ากัน */
+    #paperWrapper {
+      container-type: inline-size;
+    }
+
     /* อัตราส่วนกระดาษแนวนอนเสมอ (297:210 หรือ ~1.414:1) */
     .paper-sheet {
       background: #ffffff;
@@ -37,7 +42,7 @@
     .tape-guide-active::after {
       content: 'แนวเขตปลอดภัย (เว้นขอบสำหรับติดเทปใส)';
       position: absolute;
-      inset: var(--sheet-margin, 24px);
+      inset: calc(var(--sheet-margin, 24px) - 1.5cqw);
       border: 1.5px dashed #93c5fd;
       border-radius: 6px;
       pointer-events: none;
@@ -371,7 +376,7 @@
 
               <div id="lblRecNameLine" class="font-bold text-slate-900 leading-snug">
                 <span id="outRecName">-</span>
-                <span id="outRecPhone" class="font-semibold ml-2"></span>
+                <span id="outRecPhone" class="font-semibold whitespace-nowrap"></span>
               </div>
 
               <div id="outRecAddress" class="font-medium text-slate-800 whitespace-pre-line leading-relaxed pt-0.5">-</div>
@@ -714,18 +719,22 @@ function reply(obj) {
     let syncTimer = null;
     let lastPullAt = 0;
 
+    // ขนาดตัวอักษรเป็น pt บนกระดาษจริง (เหมือนใน Word) ไม่ขึ้นกับขนาดจอ
     const scaleConfig = {
-      sm: { senderTitle: 'text-base sm:text-lg', senderDetail: 'text-base sm:text-lg', recTitle: 'text-base sm:text-lg', recName: 'text-lg sm:text-xl', recAddr: 'text-sm sm:text-base', recZip: 'text-xl sm:text-2xl' },
-      md: { senderTitle: 'text-lg sm:text-xl', senderDetail: 'text-lg sm:text-xl', recTitle: 'text-lg sm:text-xl', recName: 'text-xl sm:text-2xl', recAddr: 'text-base sm:text-lg', recZip: 'text-2xl sm:text-3xl' },
-      lg: { senderTitle: 'text-xl sm:text-2xl', senderDetail: 'text-xl sm:text-2xl', recTitle: 'text-xl sm:text-2xl', recName: 'text-2xl sm:text-3xl', recAddr: 'text-lg sm:text-xl', recZip: 'text-3xl sm:text-4xl' },
-      xl: { senderTitle: 'text-2xl sm:text-3xl', senderDetail: 'text-2xl sm:text-3xl', recTitle: 'text-2xl sm:text-3xl', recName: 'text-3xl sm:text-4xl', recAddr: 'text-xl sm:text-2xl', recZip: 'text-4xl sm:text-5xl' }
+      sm: { senderTitle: 11, senderDetail: 13, recTitle: 11, recName: 15, recAddr: 12,   recZip: 20 },
+      md: { senderTitle: 12, senderDetail: 15, recTitle: 12, recName: 17, recAddr: 13.5, recZip: 24 },
+      lg: { senderTitle: 14, senderDetail: 17, recTitle: 14, recName: 20, recAddr: 16,   recZip: 28 },
+      xl: { senderTitle: 16, senderDetail: 20, recTitle: 16, recName: 24, recAddr: 19,   recZip: 34 }
     };
 
+    // ระยะขอบเป็นมิลลิเมตรบนกระดาษจริง
     const marginConfig = {
-      normal: { padClass: 'p-5 sm:p-8 print:p-[16mm]', cssVar: '18px' },
-      tape:   { padClass: 'p-7 sm:p-12 print:p-[25mm]', cssVar: '28px' },
-      extra:  { padClass: 'p-9 sm:p-16 print:p-[32mm]', cssVar: '38px' }
+      normal: { mm: 16 },
+      tape:   { mm: 25 },
+      extra:  { mm: 32 }
     };
+
+    const paperWidthMm = { A5: 210, A4: 297 };
 
     const recPosConfig = {
       'center-right':     'w-[64%] sm:w-[58%] pr-4 pb-2',
@@ -1338,10 +1347,16 @@ function reply(obj) {
       document.getElementById('outRecAddress').textContent = rAddr || '-';
       document.getElementById('outRecZip').textContent = rZip || '';
 
+      // แปลง มม./pt บนกระดาษ → cqw (% ของความกว้างกระดาษ)
+      const widthMm = paperWidthMm[currentPaperSize];
+      const mmToCq = mm => `${(mm / widthMm * 100).toFixed(3)}cqw`;
+      const ptToCq = pt => mmToCq(pt * 25.4 / 72);
+
       const sheet = document.getElementById('printableSheet');
-      const mCfg = marginConfig[currentMarginPreset];
-      sheet.className = `paper-sheet flex flex-col justify-between text-slate-900 ${mCfg.padClass}`;
-      sheet.style.setProperty('--sheet-margin', mCfg.cssVar);
+      const marginCq = mmToCq(marginConfig[currentMarginPreset].mm);
+      sheet.className = 'paper-sheet flex flex-col justify-between text-slate-900';
+      sheet.style.padding = marginCq;
+      sheet.style.setProperty('--sheet-margin', marginCq);
 
       const showGuide = document.getElementById('showTapeGuideToggle').checked;
       if (showGuide) sheet.classList.add('tape-guide-active');
@@ -1350,12 +1365,12 @@ function reply(obj) {
       document.getElementById('recipientBlock').className = `text-left space-y-1.5 transition-all duration-200 ${posClass}`;
 
       const cfg = scaleConfig[currentFontScale];
-      document.getElementById('lblSenderTitle').className = `font-bold text-slate-800 leading-snug ${cfg.senderTitle}`;
-      document.getElementById('outSenderName').parentElement.className = `font-semibold text-slate-900 leading-snug tracking-wide ${cfg.senderDetail}`;
-      document.getElementById('lblRecTitle').className = `font-bold text-slate-800 leading-snug ${cfg.recTitle}`;
-      document.getElementById('lblRecNameLine').className = `font-bold text-slate-900 leading-snug ${cfg.recName}`;
-      document.getElementById('outRecAddress').className = `font-medium text-slate-800 whitespace-pre-line leading-relaxed pt-0.5 ${cfg.recAddr}`;
-      document.getElementById('outRecZip').className = `font-bold text-slate-900 tracking-widest pt-1 text-right pr-4 ${cfg.recZip}`;
+      document.getElementById('lblSenderTitle').style.fontSize = ptToCq(cfg.senderTitle);
+      document.getElementById('outSenderName').parentElement.style.fontSize = ptToCq(cfg.senderDetail);
+      document.getElementById('lblRecTitle').style.fontSize = ptToCq(cfg.recTitle);
+      document.getElementById('lblRecNameLine').style.fontSize = ptToCq(cfg.recName);
+      document.getElementById('outRecAddress').style.fontSize = ptToCq(cfg.recAddr);
+      document.getElementById('outRecZip').style.fontSize = ptToCq(cfg.recZip);
     }
 
     function setMarginPreset(preset) {
@@ -1399,6 +1414,7 @@ function reply(obj) {
       document.getElementById('printBtnSizeLabel').textContent = size;
       document.getElementById('hintPaperSize').textContent = size;
       document.getElementById('dynamicPageRule').innerHTML = `@page { size: ${size} landscape; margin: 0mm; }`;
+      updatePreview();
     }
 
     function setFontScale(scale) {
