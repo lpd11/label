@@ -298,52 +298,6 @@
         </div>
         <p class="text-[11px] text-slate-400 -mt-1">กดสั่งพิมพ์แล้วระบบจะบันทึกผู้รับให้อัตโนมัติด้วย ถ้าเลือกมาจากรายชื่อแล้วแก้ จะอัปเดตคนเดิม ไม่สร้างซ้ำ</p>
       </div>
-
-      <!-- กล่องที่ 3: ปรับระยะขอบติดเทป & ตำแหน่งผู้รับ -->
-      <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200/90 space-y-3.5">
-        <div class="flex items-center justify-between">
-          <label class="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-            <i data-lucide="sliders-horizontal" class="w-4 h-4 text-blue-600"></i>
-            ตั้งค่าระยะขอบติดเทป & ตำแหน่ง
-          </label>
-          <label class="inline-flex items-center gap-1.5 cursor-pointer select-none">
-            <input type="checkbox" id="showTapeGuideToggle" checked onchange="updatePreview()" class="rounded text-blue-600 focus:ring-blue-500">
-            <span class="text-[11px] text-slate-500 font-medium">แสดงเส้นประแนวติดเทป</span>
-          </label>
-        </div>
-
-        <!-- เลือกระยะขอบกระดาษสำหรับติดเทป -->
-        <div>
-          <span class="block text-[11px] font-semibold text-slate-500 mb-1.5">1. เว้นระยะขอบกระดาษรอบด้าน (เผื่อติดเทปใส):</span>
-          <div class="grid grid-cols-3 gap-1.5 bg-slate-100 p-1 rounded-xl">
-            <button onclick="setMarginPreset('normal')" id="margin_normal" class="margin-btn py-1.5 rounded-lg text-xs font-semibold text-slate-600">ปกติ (1.6 ซม.)</button>
-            <button onclick="setMarginPreset('tape')" id="margin_tape" class="margin-btn py-1.5 rounded-lg text-xs font-bold bg-white text-blue-600 shadow-sm">กว้าง-ติดเทป (2.5 ซม.)</button>
-            <button onclick="setMarginPreset('extra')" id="margin_extra" class="margin-btn py-1.5 rounded-lg text-xs font-semibold text-slate-600">กว้างพิเศษ (3.2 ซม.)</button>
-          </div>
-        </div>
-
-        <!-- เลือกตำแหน่งบล็อกผู้รับ -->
-        <div>
-          <span class="block text-[11px] font-semibold text-slate-500 mb-1.5">2. ตำแหน่งส่วนของ "ผู้รับ":</span>
-          <div class="grid grid-cols-3 gap-1.5 bg-slate-100 p-1 rounded-xl">
-            <button onclick="setRecPosition('center-right')" id="pos_center-right" class="pos-btn py-1.5 rounded-lg text-xs font-semibold text-slate-600">กลางค่อนขวา</button>
-            <button onclick="setRecPosition('bottom-right')" id="pos_bottom-right" class="pos-btn py-1.5 rounded-lg text-xs font-bold bg-white text-blue-600 shadow-sm">ขวาล่าง (แนะนำ)</button>
-            <button onclick="setRecPosition('far-bottom-right')" id="pos_far-bottom-right" class="pos-btn py-1.5 rounded-lg text-xs font-semibold text-slate-600">ชิดขวาล่างสุด</button>
-          </div>
-        </div>
-
-        <!-- เลือกขนาดตัวอักษร -->
-        <div>
-          <span class="block text-[11px] font-semibold text-slate-500 mb-1.5">3. ขนาดตัวอักษรบนใบปะหน้า:</span>
-          <div class="grid grid-cols-4 gap-1.5 bg-slate-100 p-1 rounded-xl">
-            <button onclick="setFontScale('sm')" id="scale_sm" class="scale-btn py-1.5 rounded-lg text-xs font-semibold text-slate-600">เล็ก</button>
-            <button onclick="setFontScale('md')" id="scale_md" class="scale-btn py-1.5 rounded-lg text-xs font-bold bg-white text-blue-600 shadow-sm">กลาง</button>
-            <button onclick="setFontScale('lg')" id="scale_lg" class="scale-btn py-1.5 rounded-lg text-xs font-semibold text-slate-600">ใหญ่</button>
-            <button onclick="setFontScale('xl')" id="scale_xl" class="scale-btn py-1.5 rounded-lg text-xs font-semibold text-slate-600">ใหญ่พิเศษ</button>
-          </div>
-        </div>
-      </div>
-
     </section>
 
     <!-- ฝั่งขวา: ตัวอย่างใบปะหน้าแนวนอน -->
@@ -385,6 +339,51 @@
             </div>
           </div>
 
+        </div>
+      </div>
+
+      <!-- ตั้งค่าระยะขอบ / ตำแหน่ง / ขนาดตัวอักษร (อยู่ใต้ใบปะหน้า ปรับแล้วเห็นผลทันที) -->
+      <div class="no-print bg-white rounded-2xl p-4 shadow-sm border border-slate-200/90 space-y-3.5">
+        <div class="flex items-center justify-between">
+          <label class="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+            <i data-lucide="sliders-horizontal" class="w-4 h-4 text-blue-600"></i>
+            ตั้งค่าระยะขอบติดเทป & ตำแหน่ง
+          </label>
+          <label class="inline-flex items-center gap-1.5 cursor-pointer select-none">
+            <input type="checkbox" id="showTapeGuideToggle" checked onchange="updatePreview()" class="rounded text-blue-600 focus:ring-blue-500">
+            <span class="text-[11px] text-slate-500 font-medium">แสดงเส้นประแนวติดเทป</span>
+          </label>
+        </div>
+
+        <!-- เลือกระยะขอบกระดาษสำหรับติดเทป -->
+        <div>
+          <span class="block text-[11px] font-semibold text-slate-500 mb-1.5">1. เว้นระยะขอบกระดาษรอบด้าน (เผื่อติดเทปใส):</span>
+          <div class="grid grid-cols-3 gap-1.5 bg-slate-100 p-1 rounded-xl">
+            <button onclick="setMarginPreset('normal')" id="margin_normal" class="margin-btn py-1.5 rounded-lg text-xs font-semibold text-slate-600">ปกติ (1.6 ซม.)</button>
+            <button onclick="setMarginPreset('tape')" id="margin_tape" class="margin-btn py-1.5 rounded-lg text-xs font-bold bg-white text-blue-600 shadow-sm">กว้าง-ติดเทป (2.5 ซม.)</button>
+            <button onclick="setMarginPreset('extra')" id="margin_extra" class="margin-btn py-1.5 rounded-lg text-xs font-semibold text-slate-600">กว้างพิเศษ (3.2 ซม.)</button>
+          </div>
+        </div>
+
+        <!-- เลือกตำแหน่งบล็อกผู้รับ -->
+        <div>
+          <span class="block text-[11px] font-semibold text-slate-500 mb-1.5">2. ตำแหน่งส่วนของ "ผู้รับ":</span>
+          <div class="grid grid-cols-3 gap-1.5 bg-slate-100 p-1 rounded-xl">
+            <button onclick="setRecPosition('center-right')" id="pos_center-right" class="pos-btn py-1.5 rounded-lg text-xs font-semibold text-slate-600">กลางค่อนขวา</button>
+            <button onclick="setRecPosition('bottom-right')" id="pos_bottom-right" class="pos-btn py-1.5 rounded-lg text-xs font-bold bg-white text-blue-600 shadow-sm">ขวาล่าง (แนะนำ)</button>
+            <button onclick="setRecPosition('far-bottom-right')" id="pos_far-bottom-right" class="pos-btn py-1.5 rounded-lg text-xs font-semibold text-slate-600">ชิดขวาล่างสุด</button>
+          </div>
+        </div>
+
+        <!-- เลือกขนาดตัวอักษร -->
+        <div>
+          <span class="block text-[11px] font-semibold text-slate-500 mb-1.5">3. ขนาดตัวอักษรบนใบปะหน้า:</span>
+          <div class="grid grid-cols-4 gap-1.5 bg-slate-100 p-1 rounded-xl">
+            <button onclick="setFontScale('sm')" id="scale_sm" class="scale-btn py-1.5 rounded-lg text-xs font-semibold text-slate-600">เล็ก</button>
+            <button onclick="setFontScale('md')" id="scale_md" class="scale-btn py-1.5 rounded-lg text-xs font-bold bg-white text-blue-600 shadow-sm">กลาง</button>
+            <button onclick="setFontScale('lg')" id="scale_lg" class="scale-btn py-1.5 rounded-lg text-xs font-semibold text-slate-600">ใหญ่</button>
+            <button onclick="setFontScale('xl')" id="scale_xl" class="scale-btn py-1.5 rounded-lg text-xs font-semibold text-slate-600">ใหญ่พิเศษ</button>
+          </div>
         </div>
       </div>
 
