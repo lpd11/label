@@ -196,7 +196,7 @@
           <i data-lucide="printer" class="w-5 h-5"></i>
         </div>
         <div class="truncate">
-          <h1 class="text-sm sm:text-base font-bold text-slate-800 leading-tight truncate">พิมพ์ใบปะหน้าพัสดุ <span class="text-[10px] font-semibold text-slate-400 align-middle">v1.3</span></h1>
+          <h1 class="text-sm sm:text-base font-bold text-slate-800 leading-tight truncate">พิมพ์ใบปะหน้าพัสดุ <span class="text-[10px] font-semibold text-slate-400 align-middle">v1.4</span></h1>
           <div class="flex items-center gap-1.5">
             <span id="cloudStatusDot" class="w-2 h-2 rounded-full bg-slate-300"></span>
             <p id="cloudStatusText" class="text-[11px] text-slate-500 truncate">เก็บในเครื่อง (ยังไม่ได้เชื่อม Sheets)</p>
@@ -799,6 +799,9 @@ function reply(obj) {
       lg: { senderTitle: 14, senderDetail: 17, recTitle: 14, recName: 20, recAddr: 16,   recZip: 20 },
       xl: { senderTitle: 16, senderDetail: 20, recTitle: 16, recName: 24, recAddr: 19,   recZip: 24 }
     };
+
+    // ป้ายระวังแตกขยายตามขนาดตัวอักษรที่เลือก
+    const FRAGILE_SCALE = { sm: 0.9, md: 1, lg: 1.12, xl: 1.25 };
 
     // ระยะขอบเป็นมิลลิเมตรบนกระดาษจริง
     const marginConfig = {
@@ -1540,9 +1543,10 @@ function reply(obj) {
         const phone = l.phone
           ? (l.phone.startsWith('(') && l.phone.endsWith(')') ? l.phone : `(${l.phone})`)
           : '';
-        // ป้ายระวังแตก: มุมขวาบน กว้าง 42 มม. บนกระดาษจริง
+        // ป้ายระวังแตก: มุมขวาบน ขนาดตามโหมดกระดาษ × ขนาดตัวอักษรที่เลือก (ถ้าชนบล็อกผู้รับ fitFragileBadges() ย่อให้)
+        const badgeMm = (half ? 34 : 55) * FRAGILE_SCALE[currentFontScale];
         const fragile = l.fragile
-          ? `<img src="fragile.png" alt="ระวังแตก ห้ามโยน" style="position:absolute;top:${marginCq};right:${marginCq};width:${mmToCq(42)};height:auto">`
+          ? `<img src="fragile.png" alt="ระวังแตก ห้ามโยน" class="fragile-badge" style="position:absolute;top:${marginCq};right:${marginCq};width:${mmToCq(badgeMm)};aspect-ratio:900/640;height:auto">`
           : '';
         return `
           <div class="label ${guide}" style="padding:${marginCq};--sheet-margin:${marginCq}">
@@ -1552,7 +1556,7 @@ function reply(obj) {
               <div class="font-semibold text-slate-900 leading-snug tracking-wide" style="${fs('senderDetail')}">${escapeHtml(sName || '-')}<span class="ml-3">${escapeHtml(sPhone)}</span></div>
             </div>
             <div class="w-full flex justify-end mt-auto">
-              <div class="text-left space-y-1.5 ${posClass}">
+              <div class="rec-block text-left space-y-1.5 ${posClass}">
                 <div class="font-bold text-slate-800 leading-snug" style="${fs('recTitle')}">ผู้รับ</div>
                 <div class="font-bold text-slate-900 leading-snug" style="${fs('recName')}">${escapeHtml(l.name || '-')} <span class="font-semibold whitespace-nowrap">${escapeHtml(phone)}</span></div>
                 <div class="font-medium text-slate-800 whitespace-pre-line leading-relaxed pt-0.5" style="${fs('recAddr')}">${escapeHtml(l.address || '-')}</div>
@@ -1575,6 +1579,24 @@ function reply(obj) {
       const wrapper = document.getElementById('paperWrapper');
       wrapper.className = `w-full text-slate-900 ${half ? 'mode-half' : 'mode-full'}`;
       wrapper.innerHTML = html;
+      fitFragileBadges();
+    }
+
+    // ถ้าป้ายระวังแตกลงไปชิดบล็อกผู้รับ ย่อป้ายให้เหลือระยะห่างอย่างน้อย 2% ของความกว้างกระดาษ
+    // (วัดจากตัวอย่างบนจอ ขนาดเป็น cqw จึงได้สัดส่วนเดียวกันตอนพิมพ์; ถ้าตัวอย่างถูกซ่อนอยู่จะวัดไม่ได้ ใช้ขนาดปกติ)
+    function fitFragileBadges() {
+      const wrapper = document.getElementById('paperWrapper');
+      const base = wrapper.clientWidth;
+      if (!base) return;
+      wrapper.querySelectorAll('.label').forEach(label => {
+        const img = label.querySelector('.fragile-badge');
+        const rec = label.querySelector('.rec-block');
+        if (!img || !rec) return;
+        const maxH = rec.offsetTop - img.offsetTop - base * 0.02;
+        if (maxH > 0 && img.offsetHeight > maxH) {
+          img.style.width = `${(maxH * 900 / 640 / base * 100).toFixed(3)}cqw`;
+        }
+      });
     }
 
     function setMarginPreset(preset) {
@@ -1701,6 +1723,7 @@ function reply(obj) {
       if (view === 'preview') {
         formPanel.classList.add('hidden');
         previewPanel.classList.remove('hidden');
+        renderSheets(); // ตอนซ่อนอยู่วัดขนาดป้ายไม่ได้ วาดใหม่ตอนแสดง
         tabPreviewBtn.className = 'flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold bg-white text-blue-600 shadow-sm transition';
         tabFormBtn.className = 'flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold text-slate-600 transition';
       } else {
