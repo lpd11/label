@@ -196,7 +196,7 @@
           <i data-lucide="printer" class="w-5 h-5"></i>
         </div>
         <div class="truncate">
-          <h1 class="text-sm sm:text-base font-bold text-slate-800 leading-tight truncate">พิมพ์ใบปะหน้าพัสดุ <span class="text-[10px] font-semibold text-slate-400 align-middle">v1.2</span></h1>
+          <h1 class="text-sm sm:text-base font-bold text-slate-800 leading-tight truncate">พิมพ์ใบปะหน้าพัสดุ <span class="text-[10px] font-semibold text-slate-400 align-middle">v1.3</span></h1>
           <div class="flex items-center gap-1.5">
             <span id="cloudStatusDot" class="w-2 h-2 rounded-full bg-slate-300"></span>
             <p id="cloudStatusText" class="text-[11px] text-slate-500 truncate">เก็บในเครื่อง (ยังไม่ได้เชื่อม Sheets)</p>
@@ -365,6 +365,13 @@
             placeholder="เช่น 10250"
             class="w-full px-3 py-2 rounded-xl border border-slate-300 text-base font-bold tracking-wider text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none">
         </div>
+
+        <!-- ป้ายระวังแตก (เลือกแยกแต่ละใบ) -->
+        <label class="flex items-center gap-2.5 p-2.5 rounded-xl border border-red-200 bg-red-50/60 cursor-pointer select-none">
+          <input id="recFragile" type="checkbox" onchange="updatePreview()" class="w-4 h-4 rounded text-red-600 focus:ring-red-500">
+          <img src="fragile.png" alt="" class="h-7 w-auto rounded">
+          <span class="text-xs font-bold text-red-800">ใส่สัญลักษณ์ระวังแตก (มุมขวาบน)</span>
+        </label>
 
         <!-- ปุ่มบันทึกผู้รับเก็บไว้ -->
         <div class="pt-1 flex items-center gap-2">
@@ -1442,7 +1449,7 @@ function reply(obj) {
     // ==================== ใบที่ 1 / ใบที่ 2 ====================
     // ฟอร์มแสดงข้อมูลของใบที่เลือกอยู่ (activeSlot) เสมอ ส่วนใบอื่นเก็บไว้ใน labels
     function emptyLabel() {
-      return { name: '', phone: '', address: '', zip: '', recipientId: null };
+      return { name: '', phone: '', address: '', zip: '', fragile: false, recipientId: null };
     }
 
     function readForm() {
@@ -1451,6 +1458,7 @@ function reply(obj) {
         phone: document.getElementById('recPhone').value.trim(),
         address: document.getElementById('recAddress').value,
         zip: document.getElementById('recZip').value.trim(),
+        fragile: document.getElementById('recFragile').checked,
         recipientId: currentRecipientId
       };
     }
@@ -1460,6 +1468,7 @@ function reply(obj) {
       document.getElementById('recPhone').value = l.phone || '';
       document.getElementById('recAddress').value = l.address || '';
       document.getElementById('recZip').value = l.zip || '';
+      document.getElementById('recFragile').checked = !!l.fragile;
       currentRecipientId = l.recipientId || null;
     }
 
@@ -1531,8 +1540,13 @@ function reply(obj) {
         const phone = l.phone
           ? (l.phone.startsWith('(') && l.phone.endsWith(')') ? l.phone : `(${l.phone})`)
           : '';
+        // ป้ายระวังแตก: มุมขวาบน กว้าง 42 มม. บนกระดาษจริง
+        const fragile = l.fragile
+          ? `<img src="fragile.png" alt="ระวังแตก ห้ามโยน" style="position:absolute;top:${marginCq};right:${marginCq};width:${mmToCq(42)};height:auto">`
+          : '';
         return `
           <div class="label ${guide}" style="padding:${marginCq};--sheet-margin:${marginCq}">
+            ${fragile}
             <div class="space-y-1">
               <div class="font-bold text-slate-800 leading-snug" style="${fs('senderTitle')}">ผู้ส่ง</div>
               <div class="font-semibold text-slate-900 leading-snug tracking-wide" style="${fs('senderDetail')}">${escapeHtml(sName || '-')}<span class="ml-3">${escapeHtml(sPhone)}</span></div>
@@ -1669,6 +1683,7 @@ function reply(obj) {
     // ล้างเฉพาะใบที่เลือกอยู่
     function clearRecipient() {
       currentRecipientId = null;
+      document.getElementById('recFragile').checked = false;
       document.getElementById('recName').value = '';
       document.getElementById('recPhone').value = '';
       document.getElementById('recAddress').value = '';

@@ -2,9 +2,10 @@
 // - หน้าเว็บ/ไฟล์ของเราเอง: เอาจากเน็ตก่อน (อัปเดตมาถึงทันที) ไม่มีเน็ตค่อยใช้ของในเครื่อง
 // - Tailwind / ไอคอน / ฟอนต์จาก CDN: ใช้ของในเครื่องก่อน แล้วอัปเดตเบื้องหลัง
 // - Google Apps Script (ซิงค์รายชื่อ): ไม่ยุ่งเลย ต้องสดเสมอ
-const CACHE = 'label-v1.2';
+const CACHE = 'label-v1.3';
 const SHELL = [
   './',
+  './fragile.png',
   './favicon.svg',
   './apple-touch-icon.png',
   './icon-192.png',
