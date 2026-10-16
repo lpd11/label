@@ -6,6 +6,7 @@
   <title>พิมพ์ใบปะหน้าพัสดุ</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <link rel="manifest" href="manifest.webmanifest">
   <meta name="theme-color" content="#2563eb">
   <script src="https://cdn.tailwindcss.com/3.4.16"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -195,7 +196,7 @@
           <i data-lucide="printer" class="w-5 h-5"></i>
         </div>
         <div class="truncate">
-          <h1 class="text-sm sm:text-base font-bold text-slate-800 leading-tight truncate">พิมพ์ใบปะหน้าพัสดุ <span class="text-[10px] font-semibold text-slate-400 align-middle">v1.1</span></h1>
+          <h1 class="text-sm sm:text-base font-bold text-slate-800 leading-tight truncate">พิมพ์ใบปะหน้าพัสดุ <span class="text-[10px] font-semibold text-slate-400 align-middle">v1.2</span></h1>
           <div class="flex items-center gap-1.5">
             <span id="cloudStatusDot" class="w-2 h-2 rounded-full bg-slate-300"></span>
             <p id="cloudStatusText" class="text-[11px] text-slate-500 truncate">เก็บในเครื่อง (ยังไม่ได้เชื่อม Sheets)</p>
@@ -204,6 +205,13 @@
       </div>
 
       <div class="flex items-center gap-1.5 shrink-0">
+        <!-- ปุ่มติดตั้งเป็นแอป (โชว์เฉพาะเมื่อเบราว์เซอร์พร้อมให้ติดตั้ง) -->
+        <button onclick="installApp()" id="installBtn" title="ติดตั้งเป็นแอปบนเครื่องนี้"
+          class="hidden flex items-center gap-1 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 px-2.5 py-1.5 rounded-xl text-xs font-bold transition">
+          <i data-lucide="download" class="w-4 h-4"></i>
+          <span class="hidden sm:inline">ติดตั้งแอป</span>
+        </button>
+
         <!-- ปุ่มตั้งค่า Google Sheets -->
         <button onclick="openAccountModal()" id="sheetConfigBtn"
           class="flex items-center gap-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 px-2.5 py-1.5 rounded-xl text-xs font-bold transition">
@@ -1686,6 +1694,34 @@ function reply(obj) {
         tabFormBtn.className = 'flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold bg-white text-blue-600 shadow-sm transition';
         tabPreviewBtn.className = 'flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold text-slate-600 transition';
       }
+    }
+
+    // ==================== PWA ====================
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').catch(() => {});
+      });
+    }
+
+    let installPromptEvent = null;
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      installPromptEvent = e;
+      document.getElementById('installBtn').classList.remove('hidden');
+    });
+
+    window.addEventListener('appinstalled', () => {
+      installPromptEvent = null;
+      document.getElementById('installBtn').classList.add('hidden');
+      showToast('ติดตั้งแอปแล้ว เปิดได้จากหน้าจอหลัก');
+    });
+
+    async function installApp() {
+      if (!installPromptEvent) return;
+      installPromptEvent.prompt();
+      await installPromptEvent.userChoice;
+      installPromptEvent = null;
+      document.getElementById('installBtn').classList.add('hidden');
     }
 
     function handlePrint() {
