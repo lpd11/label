@@ -124,24 +124,49 @@
         background: transparent !important;
       }
 
+      /* ขนาดตอนพิมพ์เป็นมิลลิเมตรตายตัว (ไม่ใช้ vw/vh ที่แต่ละเครื่องคิดไม่เท่ากัน)
+         ความสูงหน้าเผื่อไว้ 0.5 มม. กันเกินไปขึ้นหน้าว่าง */
+      #paperWrapper.mode-half {
+        width: 210mm !important;
+        height: auto !important;
+      }
+
+      #paperWrapper.mode-full {
+        width: 297mm !important;
+        height: auto !important;
+      }
+
       .sheet-page {
         box-shadow: none !important;
         border: none !important;
         margin: 0 !important;
-        width: 100vw !important;
-        height: 100vh !important;
+        width: 100% !important;
         aspect-ratio: auto !important;
         break-inside: avoid;
         break-after: page;
+      }
+
+      .mode-half .sheet-page {
+        height: 296.5mm !important;
+      }
+
+      .mode-full .sheet-page {
+        height: 209.5mm !important;
       }
 
       .sheet-page:last-child {
         break-after: auto;
       }
 
-      .mode-half .label,
+      .mode-half .label {
+        height: 148.5mm !important;
+        flex: none !important;
+        aspect-ratio: auto !important;
+      }
+
       .mode-half .half-empty {
-        height: 50vh !important;
+        height: 148mm !important;
+        flex: none !important;
         aspect-ratio: auto !important;
       }
 
@@ -167,7 +192,7 @@
           <i data-lucide="printer" class="w-5 h-5"></i>
         </div>
         <div class="truncate">
-          <h1 class="text-sm sm:text-base font-bold text-slate-800 leading-tight truncate">พิมพ์ใบปะหน้าพัสดุ <span class="text-[10px] font-semibold text-slate-400 align-middle">v1.0</span></h1>
+          <h1 class="text-sm sm:text-base font-bold text-slate-800 leading-tight truncate">พิมพ์ใบปะหน้าพัสดุ <span class="text-[10px] font-semibold text-slate-400 align-middle">v1.1</span></h1>
           <div class="flex items-center gap-1.5">
             <span id="cloudStatusDot" class="w-2 h-2 rounded-full bg-slate-300"></span>
             <p id="cloudStatusText" class="text-[11px] text-slate-500 truncate">เก็บในเครื่อง (ยังไม่ได้เชื่อม Sheets)</p>
